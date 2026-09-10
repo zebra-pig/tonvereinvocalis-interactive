@@ -12,6 +12,10 @@ export const DRUM_H = 0.9
 export const FLAME_H = 2.2
 export const FLAME_W = 1.1 // flame width at its base, it narrows towards the tip
 export const LOGS_W = 1.2
+export const LIGHTS_R = 0.55 // stage lights on a truss drop
+export const CONTROLLERS_R = 0.5 // game controllers dangling from their cables
+export const PHONES_R = 0.55 // pile of phones
+export const TIRE_R = 0.62 // stacked car tyres, seen from the side
 export const WIND_W = 1.8
 export const MOUNTAIN_BASE = -WORLD_H / 2 - 0.5 // mountains stand just below the screen edge
 export const MOUNTAIN_MAX_SCALE = 2.6
@@ -28,11 +32,19 @@ const FIRST_DISTANCE = 6 // ~2.4 s until the first obstacle, even on wide screen
 const LIFT = 16 // updraft acceleration in the middle of a wind column, stronger than gravity
 const MAX_RISE = 5.5 // updrafts can't accelerate the plane beyond this
 
+export type Top = 'drums' | 'lights' | 'controllers'
+export type Bottom = 'drums' | 'matterhorn' | 'fire' | 'phones' | 'tires'
+
+// Kinds that have models so far; the rest join once theirs exist.
+const TOPS: Top[] = ['drums']
+const BOTTOMS: Bottom[] = ['drums', 'matterhorn', 'fire']
+const HALF_WIDTH = { drums: DRUM_R, lights: LIGHTS_R, controllers: CONTROLLERS_R, phones: PHONES_R, tires: TIRE_R }
+
 export type Obstacle = {
   x: number
   gapY: number
-  top: 'drums' | null
-  bottom: 'drums' | 'matterhorn' | 'fire' | null
+  top: Top | null
+  bottom: Bottom | null
   wind: boolean
   seed: number // for visual variety only
   passed: boolean
@@ -112,8 +124,10 @@ export function parts(o: Obstacle): V2[][] {
   const bottom = o.gapY - GAP / 2
   const far = WORLD_H * 2
   const shapes: V2[][] = []
-  if (o.top === 'drums') shapes.push(box(o.x, DRUM_R, top, far))
-  if (o.bottom === 'drums') shapes.push(box(o.x, DRUM_R, -far, bottom))
+  if (o.top) shapes.push(box(o.x, HALF_WIDTH[o.top], top, far))
+  if (o.bottom === 'drums' || o.bottom === 'phones' || o.bottom === 'tires') {
+    shapes.push(box(o.x, HALF_WIDTH[o.bottom], -far, bottom))
+  }
   if (o.bottom === 'fire') {
     const flameBase = bottom - FLAME_H
     shapes.push(box(o.x, LOGS_W / 2, -far, flameBase))
@@ -164,15 +178,19 @@ function createObstacle(game: Game, x: number): Obstacle {
   const kind = game.random()
   const seed = game.random()
   if (kind < 0.12) return { x, gapY: 0, top: null, bottom: null, wind: true, seed, passed: false } // free updraft
+  const top = pick(game, TOPS)
   if (kind < 0.26) {
-    // updraft under hanging drums: the drums hang high, the wind pushes the plane towards them
-    return { x, gapY: 0.3 + game.random() * 2.7 - GAP / 2, top: 'drums', bottom: null, wind: true, seed, passed: false }
+    // updraft under a hanging part: it hangs high, the wind pushes the plane towards it
+    return { x, gapY: 0.3 + game.random() * 2.7 - GAP / 2, top, bottom: null, wind: true, seed, passed: false }
   }
-  const bottoms = ['drums', 'matterhorn', 'fire'] as const
-  const bottom = bottoms[Math.floor(game.random() * bottoms.length)]
+  const bottom = pick(game, BOTTOMS)
   const range = WORLD_H / 2 - 1 - GAP / 2
   const gapY = (game.random() * 2 - 1) * range
-  return { x, gapY, top: 'drums', bottom, wind: game.random() < 0.15, seed, passed: false } // wind helps through the gap
+  return { x, gapY, top, bottom, wind: false, seed, passed: false } // no wind above something rising from below
+}
+
+function pick<T>(game: Game, options: T[]): T {
+  return options[Math.floor(game.random() * options.length)]
 }
 
 function box(x: number, halfWidth: number, y0: number, y1: number): V2[] {

@@ -38,7 +38,11 @@ export function createObstacleView(o: Obstacle): ObstacleView {
   const group = new THREE.Group()
   const top = new THREE.Group()
   const bottom = new THREE.Group()
-  group.add(top, bottom)
+  const wind = new THREE.Group()
+  top.name = 'top'
+  bottom.name = 'bottom'
+  wind.name = 'wind'
+  group.add(top, bottom, wind)
   const disposables: { dispose(): void }[] = []
   const gapTop = o.gapY + GAP / 2
   const gapBottom = o.gapY - GAP / 2
@@ -50,8 +54,8 @@ export function createObstacleView(o: Obstacle): ObstacleView {
 
   let leaves: ((seconds: number) => void) | undefined
   if (o.wind) {
-    const zone = leafZone(o.bottom ? gapBottom : -FAR, o.top ? gapTop : FAR, random)
-    bottom.add(zone.mesh)
+    const zone = leafZone(-FAR, o.top ? gapTop : FAR, random) // wind columns never have a bottom part
+    wind.add(zone.mesh)
     disposables.push(zone.mesh)
     leaves = zone.update
   }
@@ -61,6 +65,7 @@ export function createObstacleView(o: Obstacle): ObstacleView {
     slide(k) {
       top.position.y = (1 - k) * WORLD_H
       bottom.position.y = -(1 - k) * WORLD_H
+      wind.position.y = bottom.position.y // leaves blow in from below
       group.visible = k > 0
     },
     update(seconds) {
@@ -259,7 +264,7 @@ function leafZone(bottomY: number, topY: number, random: () => number) {
     mesh.setColorAt(i, tint.set(LEAVES[Math.floor(random() * LEAVES.length)]))
     return {
       phase: random(),
-      x: (random() * 2 - 1) * WIND_W * 0.4,
+      x: (random() * 2 - 1) * WIND_W * 0.3, // plus sway, stays inside the wind column
       z: (random() * 2 - 1) * 0.7,
       speed: 1.8 + random() * 1.4,
       sway: 0.1 + random() * 0.2,

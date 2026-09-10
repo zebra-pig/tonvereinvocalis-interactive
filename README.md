@@ -2,7 +2,7 @@
 
 `<vocalis-flyer-interaktiv>` — an interactive concert "flyer" for [tonvereinvocalis.ch](https://tonvereinvocalis.ch): an A4 flyer that folds into a paper plane, which you then fly through a Flappy Bird–style obstacle course. Shipped as a web component, embedded in Webstudio, hosted as an assets-only Cloudflare Worker.
 
-> Status: first playable version. Placeholder flyer and obstacles, no sounds yet.
+> Status: playable. Placeholder flyer, no sounds yet.
 
 ## Concept
 
@@ -52,7 +52,8 @@ src/vocalis-flyer-interaktiv.ts  Custom Element: shadow DOM, <img> poster, overl
 src/scene.ts          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
 src/fold.ts           origami data + foldAt(t)
 src/game.ts           pure game logic (no Three.js): physics, spawning, collision, scoring
-src/check.ts          `node src/check.ts` (Node 24 strips types natively) — asserts for game logic and fold
+src/obstacles.ts      low-poly obstacle models (drums, Matterhorn, fire shader, wind leaves)
+src/*.test.ts         Vitest tests for game logic and fold (`pnpm test`)
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 ```
 
@@ -73,7 +74,11 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
   - Runs a fixed 50 Hz step with an accumulator, so speed doesn't depend on screen refresh rate.
   - Plane pitch follows vertical speed.
   - Collision: circle vs. obstacle boxes. Score goes up once per passed obstacle.
-- **Obstacles:** placeholder boxes behind a `createObstacle()` function, to be swapped for program-themed GLB models (`GLTFLoader`).
+- **Obstacles:** stylized low-poly models built in code (`src/obstacles.ts`), no model files. Hitboxes in `game.ts` use the same numbers, and `obstacles.test.ts` checks that every model stays inside its hitbox.
+  - **Top:** Basler Trommeln hanging on a strap.
+  - **Bottom:** stacked Trommeln, the Matterhorn (triangular hitbox along its slopes), or a log fire with an animated TSL flame shader (noise cut-out, no blending).
+  - **Wind:** autumn leaves blow up through an updraft that lifts the plane. It only appears where nothing rises from below: as a free column (being blown off the top ends the flight) or under a hanging part.
+  - **Planned:** stage lights and game controllers hanging from the top; piles of phones and car tyres at the bottom.
   - They slide in with the plane's flight into position: top parts from above, bottom parts from below, left to right as a wave. They slide back out when unfolding, and new ones slide in after a retry.
 - **Overlay UI** (HTML in shadow DOM):
   - "Tippen zum Falten" hint
@@ -151,7 +156,7 @@ pnpm run dev          # Vite dev server with the preview site (types stripped, n
 pnpm run typecheck    # tsc --noEmit (add --watch while developing)
 pnpm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer-interaktiv.js, assets/, _headers
 pnpm run preview      # build + wrangler dev (serves dist with _headers like production)
-node src/check.ts
+pnpm test             # Vitest: game rules, hitboxes, wind, fold geometry
 ```
 
 Type errors never reach production: Workers Builds runs `pnpm run build`, which stops at `tsc`.
@@ -165,7 +170,6 @@ Type errors never reach production: Workers Builds runs `pnpm run build`, which 
 
 ## Open questions
 
-- **Obstacles:** which objects from the concert program?
 - **Flyer artwork:** front (and optional back) as high-res image files.
 - **Sound samples:** recordings for `fold`, `flap`, `score`, `hit`, `unfold`.
 - **Custom domain** vs. `workers.dev`.
