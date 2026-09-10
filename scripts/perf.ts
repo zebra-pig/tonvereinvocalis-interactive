@@ -178,7 +178,9 @@ const instrument: Plugin = {
 }
 
 const outDir = `${out}dist`
-await build({ root, logLevel: 'warn', plugins: [instrument], build: { outDir, emptyOutDir: true, minify: false } })
+// The deploy build skips the test site (vite.config.ts); this measurement build needs it to have a page to open.
+const input = { index: 'index.html', 'vocalis-flyer-interaktiv': 'src/vocalis-flyer-interaktiv.ts' }
+await build({ root, logLevel: 'warn', plugins: [instrument], build: { outDir, emptyOutDir: true, minify: false, rolldownOptions: { input } } })
 const server = await preview({ root, logLevel: 'warn', build: { outDir } })
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-webgpu'] })

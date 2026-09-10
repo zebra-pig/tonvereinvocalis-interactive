@@ -9,10 +9,8 @@ export default defineConfig({
     // three/webgpu is ~780 kB (~215 kB gzip). It's lazy-loaded after the flyer image, so that's expected.
     chunkSizeWarningLimit: 1000,
     rolldownOptions: {
-      input: {
-        index: 'index.html',
-        'vocalis-flyer-interaktiv': 'src/vocalis-flyer-interaktiv.ts',
-      },
+      // Only the embed and its lazy chunks ship. index.html is the local test site: `pnpm dev` serves it, builds skip it.
+      input: { 'vocalis-flyer-interaktiv': 'src/vocalis-flyer-interaktiv.ts' },
       output: {
         // Stable name: this is the URL embedded in Webstudio.
         entryFileNames: '[name].js',

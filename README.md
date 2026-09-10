@@ -42,7 +42,7 @@ package.json          scripts: dev, typecheck, build, preview, deploy
                       deps: three · devDeps: typescript, @types/three, vite, wrangler
 tsconfig.json         strict, noEmit, allowImportingTsExtensions, erasableSyntaxOnly,
                       moduleResolution bundler, types: ["vite/client"]
-vite.config.ts        inputs: index.html (preview site) + src/vocalis-flyer-interaktiv.ts (embed entry)
+vite.config.ts        build input: src/vocalis-flyer-interaktiv.ts only (index.html is served by `pnpm dev`, never deployed)
                       output entry name stable (vocalis-flyer-interaktiv.js); chunks/assets hashed under assets/
 wrangler.jsonc        Worker "tonvereinvocalis-flyer-interaktiv" (must match the dashboard), assets.directory ./dist,
                       preview_urls true, no `main` (assets only)
@@ -160,7 +160,7 @@ Add an **HTML Embed**, check **Client Only**, and paste:
 pnpm install
 pnpm run dev          # Vite dev server with the preview site (types stripped, not checked)
 pnpm run typecheck    # tsc --noEmit (add --watch while developing)
-pnpm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer-interaktiv.js, assets/, _headers
+pnpm run build        # tsc --noEmit && vite build → dist/: vocalis-flyer-interaktiv.js, assets/, _headers (no test site)
 pnpm run preview      # build + wrangler dev (serves dist with _headers like production)
 pnpm test             # Vitest: game rules, hitboxes, wind, fold geometry
 ```
