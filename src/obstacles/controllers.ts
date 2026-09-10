@@ -1,7 +1,7 @@
 // Game controllers of different eras (generic, no brands) dangling from their cables. Hitbox: half-width
 // CONTROLLERS_R from the gap's top edge up. The column sways very slightly, staying inside the hitbox.
 import * as THREE from 'three/webgpu'
-import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
+import { type Disposable, FAR, merge, type Paint, paint } from '../geometry.ts'
 
 type Palette = { body: string; detail: string; accent: string }
 /** Geometry hangs below its cable attachment at the origin; `depth` is how far down it reaches. */
@@ -104,25 +104,27 @@ export function controllers(gapTop: number, random: () => number, disposables: D
     if (!lowest && y > FAR - 0.2) break
     previous = y
     const x = (random() - 0.5) * (lowest ? 0.1 : 0.2)
-    const z = lowest ? 0 : (random() - 0.5) * 0.5
+    const z = i * 0.3 // higher controllers hang further forward, so the cables below them can pass behind
 
     const mesh = new THREE.Mesh(model.geometry, paint)
     mesh.position.set(x, y - PIVOT, z)
     mesh.rotation.set(0, (random() - 0.5) * 0.7, (random() - 0.5) * 0.1)
     mesh.scale.setScalar(scale)
 
-    // Cable: a gentle S-bend up to above the screen.
+    // Cable: bends back right above the controller, then runs up behind everything hanging higher in a gentle S.
+    const lane = z - 0.35
     const start = new THREE.Vector3(x, y + 0.06 * scale - PIVOT, z)
-    const end = new THREE.Vector3(x * 0.5, 0.2, z * 0.5)
+    const end = new THREE.Vector3(x * 0.5, 0.2, lane)
     const bend = (random() - 0.5) * 0.16
     const cableGeometry = new THREE.TubeGeometry(
       new THREE.CatmullRomCurve3([
         start,
-        new THREE.Vector3(x + bend, THREE.MathUtils.lerp(start.y, end.y, 0.3), z),
-        new THREE.Vector3(x - bend * 0.6, THREE.MathUtils.lerp(start.y, end.y, 0.65), z * 0.7),
+        new THREE.Vector3(x, start.y + 0.14, z - 0.2),
+        new THREE.Vector3(x + bend, THREE.MathUtils.lerp(start.y, end.y, 0.3), lane),
+        new THREE.Vector3(x - bend * 0.6, THREE.MathUtils.lerp(start.y, end.y, 0.65), lane),
         end,
       ]),
-      24,
+      32,
       0.016,
       4,
     )

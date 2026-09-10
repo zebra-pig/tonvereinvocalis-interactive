@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
-import { GAP, type Obstacle, reach } from './game.ts'
-import { createObstacleView } from './obstacles.ts'
+import { GAP, type Obstacle, reach } from '../game.ts'
+import { createObstacleView } from './index.ts'
 
 const kinds: Pick<Obstacle, 'top' | 'bottom' | 'wind'>[] = [
   { top: 'drums', bottom: 'drums', wind: false },

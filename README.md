@@ -49,13 +49,14 @@ wrangler.jsonc        assets.directory ./dist, preview_urls true, no `main` (ass
 public/_headers       CORS + cache headers (see Deployment)
 index.html            preview site mimicking a /konzerte/* page (overlaid header, hero, text blocks)
 src/vocalis-flyer-interaktiv.ts  Custom Element: shadow DOM, <img> poster, overlay UI, lazy import('./scene.ts')
-src/scene.ts          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
+src/scene.ts          renderer, camera, paper plane, state machine, input, render loop
+src/audio.ts          sound effects (Web Audio) and mute
+src/storage.ts        localStorage wrapper (best score, mute)
 src/fold.ts           origami data + foldAt(t)
-src/game.ts           pure game logic (no Three.js): physics, spawning, collision, scoring
-src/obstacles.ts      obstacle views: Matterhorn, fire shader, wind leaves; wires in the models below
-src/drums.ts, lights.ts, controllers.ts, phones.ts, tires.ts   low-poly models per obstacle kind
-src/geometry.ts       shared model helpers (vertex-colour merge, seeded random)
-src/*.test.ts         Vitest tests for game logic and fold (`pnpm test`)
+src/game.ts           pure game logic (no Three.js): physics, spawning, hitboxes, wind, scoring
+src/obstacles/        one file per obstacle kind: drums, matterhorn, fire, wind, lights, controllers, phones, tires;
+                      index.ts builds the view for an obstacle, geometry.ts holds shared model helpers
+src/**/*.test.ts      Vitest tests next to the code they cover (`pnpm test`)
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 ```
 

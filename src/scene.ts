@@ -1,12 +1,12 @@
 import * as THREE from 'three/webgpu'
+import { createAudio } from './audio.ts'
 import { createPaper, SHEET_H, SHEET_W } from './fold.ts'
 import { createGame, DT, flap, type Obstacle, pitch, resize, step, WORLD_H } from './game.ts'
-import { createObstacleView, type ObstacleView } from './obstacles.ts'
+import { createObstacleView, type ObstacleView } from './obstacles/index.ts'
+import { storage } from './storage.ts'
 
 type State = 'flyer' | 'folding' | 'ready' | 'play' | 'over' | 'unfolding'
 
-// Named by event: fold, flap, score, hit, unfold. Missing files simply stay silent.
-const sounds = import.meta.glob<string>('./assets/sfx/*.{mp3,ogg,wav,m4a}', { eager: true, query: '?url', import: 'default' })
 const backUrl = Object.values(
   import.meta.glob<string>('./assets/flyer-back.*', { eager: true, query: '?url', import: 'default' }),
 )[0]
@@ -25,23 +25,6 @@ const RETRY_DELAY = 500 // ms, so frantic tapping right after a crash doesn't re
 const smooth = (t: number) => t * t * (3 - 2 * t)
 const clamp01 = (t: number) => Math.min(Math.max(t, 0), 1)
 const bob = (now: number) => Math.sin(now / 400) * 0.15
-
-const storage = {
-  get(key: string): string | null {
-    try {
-      return localStorage.getItem(`vocalis-flyer-interaktiv:${key}`)
-    } catch {
-      return null
-    }
-  },
-  set(key: string, value: string): void {
-    try {
-      localStorage.setItem(`vocalis-flyer-interaktiv:${key}`, value)
-    } catch {
-      // storage blocked: the best score just isn't remembered
-    }
-  },
-}
 
 /** Mounts the 3D flyer into the element's shadow root. Resolves to a dispose function. */
 export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: string): Promise<() => void> {
@@ -105,12 +88,8 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   const views = new Map<Obstacle, ObstacleView>()
   // Compile every obstacle's shaders up front, so the first fire doesn't stutter mid-flight.
   const tops = ['drums', 'lights', 'controllers'] as const
-  const samples = (['drums', 'matterhorn', 'fire', 'phones', 'tires'] as const).map((bottom, i): Obstacle => {
-    return { x: 0, gapY: 0, top: tops[i % tops.length], bottom, wind: i === 0, seed: 0.5, passed: false }
-  })
-  const warmups = samples.map((sample) => {
-    const view = createObstacleView(sample)
-    view.group.position.x = sample.x
+  const warmups = (['drums', 'matterhorn', 'fire', 'phones', 'tires'] as const).map((bottom, i) => {
+    const view = createObstacleView({ x: 0, gapY: 0, top: tops[i % tops.length], bottom, wind: i === 0, seed: 0.5, passed: false })
     scene.add(view.group)
     return view
   })
@@ -142,39 +121,14 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
 
   // Audio
-  let audio: AudioContext | undefined
-  let muted = storage.get('muted') === '1'
-  const buffers = new Map<string, AudioBuffer>()
+  const audio = createAudio()
   const muteButton = $<HTMLButtonElement>('.mute')
   const renderMute = () => {
-    muteButton.textContent = muted ? 'Ton an' : 'Ton aus'
-    muteButton.setAttribute('aria-pressed', String(muted))
+    muteButton.textContent = audio.muted ? 'Ton an' : 'Ton aus'
+    muteButton.setAttribute('aria-pressed', String(audio.muted))
   }
-  muteButton.hidden = Object.keys(sounds).length === 0
+  muteButton.hidden = !audio.available
   renderMute()
-
-  // Browsers only allow audio after a user gesture, so this runs on the first tap.
-  function unlockAudio(): void {
-    if (audio) return void audio.resume()
-    const context = (audio = new AudioContext())
-    for (const [path, url] of Object.entries(sounds)) {
-      const name = path.slice(path.lastIndexOf('/') + 1, path.lastIndexOf('.'))
-      fetch(url)
-        .then((response) => response.arrayBuffer())
-        .then((data) => context.decodeAudioData(data))
-        .then((buffer) => buffers.set(name, buffer))
-        .catch((error: unknown) => console.warn(`[vocalis-flyer-interaktiv] sound "${name}" failed`, error))
-    }
-  }
-
-  function play(name: string): void {
-    const buffer = buffers.get(name)
-    if (!audio || muted || !buffer) return
-    const source = audio.createBufferSource()
-    source.buffer = buffer
-    source.connect(audio.destination)
-    source.start()
-  }
 
   // Actions
   function newGame(): void {
@@ -185,16 +139,16 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
 
   function fold(): void {
-    unlockAudio()
-    play('fold')
+    audio.unlock()
+    audio.play('fold')
     newGame() // before the flight, so the plane flies to where the new game starts
     setState('folding')
   }
 
   function tap(): void {
-    unlockAudio()
+    audio.unlock()
     if (state === 'ready') setState('play')
-    if (state === 'play' && flap(game)) play('flap')
+    if (state === 'play' && flap(game)) audio.play('flap')
   }
 
   function retry(): void {
@@ -209,7 +163,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     storage.set('best', String(best))
     $('.over-score').textContent = String(game.score)
     $('.over-best').textContent = String(best)
-    play('hit')
+    audio.play('hit')
     setState('over')
   }
 
@@ -245,7 +199,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   backButton.addEventListener(
     'click',
     () => {
-      play('unfold')
+      audio.play('unfold')
       setState('unfolding')
     },
     { signal },
@@ -253,8 +207,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   muteButton.addEventListener(
     'click',
     () => {
-      muted = !muted
-      storage.set('muted', muted ? '1' : '0')
+      audio.toggleMute()
       renderMute()
     },
     { signal },
@@ -278,7 +231,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
         const { scored, hit } = step(game)
         if (scored) {
           scoreText.textContent = String(game.score)
-          play('score')
+          audio.play('score')
         }
         if (hit) gameOver()
       }
@@ -370,6 +323,6 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     intersection.disconnect()
     void renderer.setAnimationLoop(null)
     renderer.dispose()
-    void audio?.close()
+    audio.dispose()
   }
 }

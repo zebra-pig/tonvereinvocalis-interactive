@@ -2,8 +2,8 @@
 // landscape with the front towards the camera, so they read from the side. Hitbox: half-width PHONES_R from the gap's
 // bottom edge down; each phone's tilt is accounted for so the pile's top sits exactly at the gap.
 import * as THREE from 'three/webgpu'
-import { PHONES_R } from './game.ts'
-import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
+import { PHONES_R } from '../game.ts'
+import { type Disposable, FAR, merge, type Paint, paint } from '../geometry.ts'
 
 /** Portrait geometry centred on its bounds, front facing +z. */
 type Model = { geometry: THREE.BufferGeometry; length: number; width: number }

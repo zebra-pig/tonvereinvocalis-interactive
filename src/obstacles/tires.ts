@@ -1,7 +1,7 @@
 // Car tyres piled up: flat stack, sometimes one tyre leaning on top, some still on their wheel. Hitbox: half-width
 // TIRE_R from the gap's bottom edge down.
 import * as THREE from 'three/webgpu'
-import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
+import { type Disposable, FAR, merge, type Paint, paint } from '../geometry.ts'
 
 const OUTER = 0.55
 const HALF = 0.175 // half the tyre width
