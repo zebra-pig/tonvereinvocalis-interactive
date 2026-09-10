@@ -1,8 +1,8 @@
 // One view per obstacle: builds its models and animates them. The hitboxes live in game.ts and use the same numbers.
 import * as THREE from 'three/webgpu'
-import { drumStack, hangingDrums } from '../drums.ts'
+import { drumStack, hangingDrums } from './drums.ts'
 import { GAP, type Obstacle, WORLD_H } from '../game.ts'
-import { type Disposable, FAR, seeded } from '../geometry.ts'
+import { type Disposable, FAR, seeded } from './geometry.ts'
 import { controllers } from './controllers.ts'
 import { fire } from './fire.ts'
 import { stageLights } from './lights.ts'

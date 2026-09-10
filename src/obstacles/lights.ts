@@ -3,7 +3,7 @@
 import * as THREE from 'three/webgpu'
 import { color, float, mix, normalView, positionViewDirection, smoothstep, uv } from 'three/tsl'
 import type { Node } from 'three/webgpu'
-import { type Disposable, FAR, merge, type Paint, paint } from '../geometry.ts'
+import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
 
 const SECTION = 0.3 // truss section length
 const HALF = 0.13 // half the truss cross-section

@@ -1,6 +1,6 @@
 // Shared helpers for the procedural low-poly models.
 import * as THREE from 'three/webgpu'
-import { WORLD_H } from './game.ts'
+import { WORLD_H } from '../game.ts'
 
 export type V3 = [number, number, number]
 export type Paint = (triangle: number, centroid: V3) => THREE.ColorRepresentation

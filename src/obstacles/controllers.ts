@@ -1,7 +1,7 @@
 // Game controllers of different eras (generic, no brands) dangling from their cables. Hitbox: half-width
 // CONTROLLERS_R from the gap's top edge up. The column sways very slightly, staying inside the hitbox.
 import * as THREE from 'three/webgpu'
-import { type Disposable, FAR, merge, type Paint, paint } from '../geometry.ts'
+import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
 
 type Palette = { body: string; detail: string; accent: string }
 /** Geometry hangs below its cable attachment at the origin; `depth` is how far down it reaches. */

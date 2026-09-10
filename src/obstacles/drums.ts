@@ -3,7 +3,7 @@
 import * as THREE from 'three/webgpu'
 import { attribute, clamp, select, uniformArray, varyingProperty } from 'three/tsl'
 import type { Node } from 'three/webgpu'
-import { DRUM_H, DRUM_R } from './game.ts'
+import { DRUM_H, DRUM_R } from '../game.ts'
 import { type Disposable, FAR, merge, type Paint, paint, triangles, type V3 } from './geometry.ts'
 
 const LIMIT = DRUM_R + 0.085 // max |x| of any drum vertex (the hitbox slack is 0.1)
@@ -13,7 +13,7 @@ const SHELL_R = R * 0.94
 const HOOP_H = H * 0.15
 const SEGMENTS = 18
 const HOOK = new THREE.Vector3(0, H / 2 - 0.012, R + 0.028) // top of the eyelet on the upper hoop; local +z = lug side
-const STRAP_W = 0.09
+const STRAP_W = 0.11
 const STRAP_T = 0.014
 const LOOP_R = 0.51 // sling around the shell, over the cords
 const STRAND_R = 0.525 // strands running down over the bottom hoop
@@ -87,7 +87,9 @@ const drumMaterial = (() => {
   )
   const material = new THREE.MeshStandardNodeMaterial({ flatShading: true, roughness: 0.6, side: THREE.DoubleSide })
   // The node material multiplies by the instance colour afterwards, which here holds palette indices: undo that.
-  material.colorNode = (select(slot.lessThan(0.5), attribute<'vec3'>('color', 'vec3'), tinted) as Node<'vec3'>).div(style)
+  const base = select(slot.lessThan(0.5), attribute<'vec3'>('color', 'vec3'), tinted) as Node<'vec3'>
+  material.colorNode = base.div(style)
+  material.emissiveNode = base.mul(select(slot.greaterThan(HEAD - 0.5), 0.2, 0)) // calfskin heads glow a little, even from below
   return material
 })()
 
@@ -307,7 +309,7 @@ function sling(drum: THREE.Matrix4, below: THREE.Matrix4, colors: string[], rand
   const local = end.top.clone().applyMatrix4(drum.clone().invert())
   const exit = Math.atan2(local.x, local.z)
   const low = -H / 2 + HOOP_H + STRAP_W / 2 + 0.012
-  const rise = 0.06 + random() * 0.2 // tilted like a girth hitch: lowest where the strands leave
+  const rise = 0.16 + random() * 0.1 // pulled down where the strands leave, riding up the shell behind
   const loop: THREE.Vector3[] = []
   const loopNormals: THREE.Vector3[] = []
   for (let j = 0; j < 16; j++) {
@@ -409,11 +411,11 @@ export function drumStack(gapBottom: number, random: () => number, disposables: 
     const busy = i === tuckedAt || i === strapAt || (i === 0 && sticksOnTop)
     const lying: boolean = !busy && !lyingBelow && random() < (i === 0 ? 0.3 : 0.16)
     lyingBelow = lying
-    const yaw = i === strapAt ? (random() * 2 - 1) * 0.9 : random() * Math.PI * 2
+    const yaw = i === strapAt ? (random() * 2 - 1) * 0.6 : random() * Math.PI * 2
     const toward = random() * Math.PI * 2
     const tilt = busy ? 0 : random() * 0.07
     const turn = (random() * 2 - 1) * 0.6
-    const roll = random() * Math.PI * 2
+    const roll = Math.PI + (random() * 2 - 1) * 1.2 // eyelet up or to the side, not under the drum
     const { rotation, bounds } = fit(
       (spread) => (lying ? sideways(turn * spread, roll, radius, height) : upright(yaw, toward, tilt * spread, radius, height)),
       DRUM_HULL,
@@ -451,8 +453,14 @@ export function drumStack(gapBottom: number, random: () => number, disposables: 
       const radialLocal = new THREE.Vector3(0, 0, 1)
       const at = (r: number, h: number) => radialLocal.clone().multiplyScalar(r).setY(h).applyMatrix4(drum)
       const bottom = at(STRAND_R + 0.01, -H / 2 - 0.01)
-      const hang = bottom.clone().addScaledVector(end.radial, 0.05).setY(bottom.y - 0.3 - random() * 0.6)
-      const path = resample([end.top, at(R + 0.035, H / 2 - HOOP_H - 0.02), at(STRAND_R, -H / 2 + HOOP_H), bottom, hang], 0.14)
+      const length = 0.3 + random() * 0.6
+      const sway = (random() * 2 - 1) * 0.12 // the loose end drapes a little to one side
+      const loose = Array.from({ length: 5 }, (_, k) => {
+        const t = (k + 1) / 5
+        return bottom.clone().addScaledVector(end.radial, 0.05 * t).addScaledVector(end.tangent, sway * Math.sin(t * 2.5)).setY(bottom.y - length * t)
+      })
+      const hang = loose[4]
+      const path = [...resample([end.top, at(R + 0.035, H / 2 - HOOP_H - 0.02), at(STRAND_R, -H / 2 + HOOP_H), bottom], 0.14), ...loose]
       const colors = STRAPS[Math.floor(random() * STRAPS.length)]
       parts.push(...end.parts, band(path, path.map(() => end.radial), colors))
       const tip = new THREE.Matrix4().makeBasis(end.tangent, UP, end.radial).setPosition(hang.clone().addScaledVector(UP, -0.03))

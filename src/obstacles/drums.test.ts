@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { expect, it } from 'vitest'
 import { drumStack, hangingDrums } from './drums.ts'
-import { DRUM_R } from './game.ts'
+import { DRUM_R } from '../game.ts'
 import { type Disposable, FAR, seeded } from './geometry.ts'
 
 const SLACK = 0.1

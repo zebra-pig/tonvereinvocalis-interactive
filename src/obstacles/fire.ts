@@ -1,12 +1,13 @@
-// Fire (photorealistic test): a plain column of flames rising from below the screen, one shader pass in TSL.
-// Domain-warped fractal noise scrolls upward, a blackbody-like ramp colours it from deep red to a white-hot core,
-// and noise shapes flickering tongues at the tip. "Glow" blending (colour stronger than coverage) keeps it luminous
-// on a light page. Embers drift up through it. Hitbox in game.ts: a column narrowing towards the tip.
+// Fire: a plain column of flames rising from below the screen, one shader pass in TSL. Realistic motion, slightly
+// stylised look: domain-warped fractal noise scrolls upward and shapes flickering tongues at the tip, while the colour
+// steps through soft bands from red to light yellow with a crisp outline. Glow blending (colour a touch stronger than
+// coverage) keeps it luminous on a light page. Embers drift up through it. Hitbox in game.ts: a column narrowing
+// towards the tip.
 import * as THREE from 'three/webgpu'
-import { abs, clamp, color, float, mix, modelPosition, mx_fractal_noise_float, positionWorld, pow, sin, smoothstep, time, vec3 } from 'three/tsl'
+import { abs, clamp, color, float, mix, modelPosition, mx_fractal_noise_float, positionWorld, sin, smoothstep, time, vec3 } from 'three/tsl'
 import type { Node } from 'three/webgpu'
 import { FLAME_H, FLAME_W } from '../game.ts'
-import { type Disposable, FAR } from '../geometry.ts'
+import { type Disposable, FAR } from './geometry.ts'
 
 const TIP = 0.35 // flame tongues flicker this far above the hitbox tip
 const CARD_W = 1.28 // the flame fades out well inside the card
@@ -29,13 +30,13 @@ const fireMaterial = (() => {
   const below = rel.y.negate().sub(TIP) // 0 at the hitbox tip, growing downwards
   const seed = modelPosition.y.mul(0.37) // differs per obstacle, so neighbouring fires don't flicker in sync
 
-  // Turbulence: a slow noise field bends the coordinates of a faster, finer one.
-  const warp = mx_fractal_noise_float(vec3(x.mul(1.3), rel.y.mul(0.9).sub(time.mul(1.6)), time.mul(0.35).add(seed)), 3, 2, 0.5)
+  // Turbulence: a slow noise field bends the coordinates of a faster one. Few octaves: big, calm shapes, little grain.
+  const warp = mx_fractal_noise_float(vec3(x.mul(1.1), rel.y.mul(0.7).sub(time.mul(1.3)), time.mul(0.3).add(seed)), 2, 2, 0.5)
   const turbulence = mx_fractal_noise_float(
-    vec3(x.mul(2.6).add(warp.mul(0.7)), rel.y.mul(1.9).sub(time.mul(3.8)).add(warp.mul(0.9)), time.mul(0.8).add(seed)),
-    5,
-    2.1,
-    0.55,
+    vec3(x.mul(1.8).add(warp.mul(0.5)), rel.y.mul(1.3).sub(time.mul(3)).add(warp.mul(0.7)), time.mul(0.6).add(seed)),
+    3,
+    2,
+    0.5,
   )
 
   // Shape: full width low down, narrowing over FLAME_H to the tip; noise licks tongues above and below it.
@@ -46,19 +47,21 @@ const fireMaterial = (() => {
   const tongues = soft(-0.15, 0.45, below.add(TIP).add(turbulence.mul(0.45)))
   const flicker = sin(time.mul(11).add(seed.mul(7))).mul(0.04).add(1)
   const hotCore = float(0.6).add(clamp(float(1).sub(across), 0, 1).mul(0.5))
-  const heat = pow(clamp(body.mul(tongues).mul(hotCore).mul(turbulence.mul(0.3).add(0.9)).mul(flicker), 0, 1), float(1.1))
+  const heat = clamp(body.mul(tongues).mul(hotCore).mul(turbulence.mul(0.3).add(0.9)).mul(flicker), 0, 1)
 
-  // Blackbody-like ramp: deep red embers → orange → yellow → white-hot core.
+  // Colour steps through a few soft bands, like a painted flame, but keeps a little of the continuous gradient.
+  const band = (edge: number) => soft(edge - 0.03, edge + 0.03, heat)
+  const tone = mix(heat, band(0.2).add(band(0.42)).add(band(0.64)).add(band(0.84)).mul(0.25), 0.75)
   const ramp = mix(
-    mix(mix(color(0x5a0a00), color(0xff4d00), soft(0.05, 0.35, heat)), color(0xffb42e), soft(0.35, 0.65, heat)),
-    color(0xfff3d6),
-    soft(0.65, 0.95, heat),
+    mix(mix(color(0xb3200c), color(0xf2551b), soft(0.2, 0.45, tone)), color(0xffa12b), soft(0.45, 0.7, tone)),
+    color(0xffe07a),
+    soft(0.7, 0.95, tone),
   )
-  const coverage = soft(0.02, 0.3, heat)
+  const coverage = soft(0.14, 0.2, heat) // crisp outline instead of a photographic haze
 
   const material = new THREE.MeshBasicNodeMaterial(glow)
-  material.colorNode = ramp.mul(heat.mul(1.6).add(coverage.mul(0.4)))
-  material.opacityNode = coverage.mul(0.85)
+  material.colorNode = ramp.mul(coverage.mul(1.1)) // a touch brighter than its coverage: a slight glow
+  material.opacityNode = coverage
   return material
 })()
 const cardGeometry = new THREE.PlaneGeometry(CARD_W, 1).translate(0, -0.5, 0) // top edge at 0, scaled down to below the screen

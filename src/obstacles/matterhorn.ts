@@ -2,7 +2,7 @@
 // viewer, shaded north face on the right. Normalised to height 1; stays inside the hitbox triangle in game.ts.
 import * as THREE from 'three/webgpu'
 import { MOUNTAIN_BASE, mountainScale, type Obstacle } from '../game.ts'
-import { hash, merge, type Paint, paint, subdivide, triangles, type V3 } from '../geometry.ts'
+import { hash, merge, type Paint, paint, subdivide, triangles, type V3 } from './geometry.ts'
 
 const mountainGeometry = (() => {
   const A: V3 = [-0.12, 1, 0]
