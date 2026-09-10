@@ -12,8 +12,8 @@ const backUrl = Object.values(
 
 const STEP_SECONDS = 0.45 // per fold
 const FLIGHT_SECONDS = 1 // folded sheet → plane in game position
-const PLANE_SCALE = 0.0036 // mm → world units, the plane ends up ~0.7 units long
-const PLANE_TILT = 0.35 // roll towards the camera so the wings read from the side
+const PLANE_SCALE = 0.005 // mm → world units, the plane ends up ~1 unit long
+const PLANE_TILT = 0.8 // roll towards the camera so the wings read from the side
 const FOV = 30
 const RETRY_DELAY = 500 // ms, so frantic tapping right after a crash doesn't restart
 
@@ -22,14 +22,14 @@ const smooth = (t: number) => t * t * (3 - 2 * t)
 const storage = {
   get(key: string): string | null {
     try {
-      return localStorage.getItem(`vocalis-flyer:${key}`)
+      return localStorage.getItem(`vocalis-flyer-interaktiv:${key}`)
     } catch {
       return null
     }
   },
   set(key: string, value: string): void {
     try {
-      localStorage.setItem(`vocalis-flyer:${key}`, value)
+      localStorage.setItem(`vocalis-flyer-interaktiv:${key}`, value)
     } catch {
       // storage blocked: the best score just isn't remembered
     }
@@ -44,7 +44,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   await renderer.init()
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
   renderer.setClearColor(0x000000, 0)
-  console.info(`[vocalis-flyer] rendering with ${'isWebGLBackend' in renderer.backend ? 'WebGL 2' : 'WebGPU'}`)
+  console.info(`[vocalis-flyer-interaktiv] rendering with ${'isWebGLBackend' in renderer.backend ? 'WebGL 2' : 'WebGPU'}`)
 
   const loader = new THREE.TextureLoader()
   const load = async (url: string) => {
@@ -152,7 +152,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
         .then((response) => response.arrayBuffer())
         .then((data) => context.decodeAudioData(data))
         .then((buffer) => buffers.set(name, buffer))
-        .catch((error: unknown) => console.warn(`[vocalis-flyer] sound "${name}" failed`, error))
+        .catch((error: unknown) => console.warn(`[vocalis-flyer-interaktiv] sound "${name}" failed`, error))
     }
   }
 

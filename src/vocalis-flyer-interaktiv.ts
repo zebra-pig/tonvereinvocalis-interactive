@@ -23,7 +23,10 @@ const template = `
     :host([state="flyer"]) .hint-fold, :host([state="ready"]) .hint-fly, :host([state="play"]) .score,
     :host([state="over"]) .over, :host([state="over"]) .back { display: block; }
     .hint { position: absolute; inset: auto 0 2.5% 0; text-align: center; font: 1.75rem/1 "Bebas Neue", sans-serif; }
-    .score { position: absolute; inset: 5% 0 auto 0; text-align: center; font: 4rem/1 "Bebas Neue", sans-serif; }
+    .score {
+      position: absolute; inset: 5% 0 auto 0; text-align: center; font: 4rem/1 "Bebas Neue", sans-serif;
+      color: #fff; -webkit-text-stroke: 6px #000; paint-order: stroke fill; /* readable on paper and obstacles */
+    }
     .over {
       position: absolute; inset: 0; margin: auto; width: fit-content; height: fit-content;
       padding: 1.25rem 2rem; background: #fff; border: 2px solid #000; text-align: center;
@@ -52,7 +55,7 @@ const template = `
   </div>
 `
 
-export class VocalisFlyer extends HTMLElement {
+export class VocalisFlyerInteraktiv extends HTMLElement {
   #root = this.attachShadow({ mode: 'open' })
   #dispose: (() => void) | undefined
   #connected = false
@@ -87,7 +90,7 @@ export class VocalisFlyer extends HTMLElement {
       if (!this.#connected) return dispose()
       this.#dispose = dispose
     } catch (error) {
-      console.warn('[vocalis-flyer] 3D unavailable, showing the static flyer', error)
+      console.warn('[vocalis-flyer-interaktiv] 3D unavailable, showing the static flyer', error)
       this.removeAttribute('state')
     }
   }
@@ -118,10 +121,10 @@ async function placeholderFlyer(): Promise<string> {
 }
 
 // Guard: the embed may be included twice, and HMR re-runs this module.
-if (!customElements.get('vocalis-flyer')) customElements.define('vocalis-flyer', VocalisFlyer)
+if (!customElements.get('vocalis-flyer-interaktiv')) customElements.define('vocalis-flyer-interaktiv', VocalisFlyerInteraktiv)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'vocalis-flyer': VocalisFlyer
+    'vocalis-flyer-interaktiv': VocalisFlyerInteraktiv
   }
 }

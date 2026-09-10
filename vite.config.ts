@@ -6,10 +6,12 @@ export default defineConfig({
     allowedHosts: ['.trycloudflare.com'],
   },
   build: {
+    // three/webgpu is ~780 kB (~215 kB gzip). It's lazy-loaded after the flyer image, so that's expected.
+    chunkSizeWarningLimit: 1000,
     rolldownOptions: {
       input: {
         index: 'index.html',
-        'vocalis-flyer': 'src/vocalis-flyer.ts',
+        'vocalis-flyer-interaktiv': 'src/vocalis-flyer-interaktiv.ts',
       },
       output: {
         // Stable name: this is the URL embedded in Webstudio.

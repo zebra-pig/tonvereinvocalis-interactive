@@ -1,6 +1,6 @@
 # tonvereinvocalis-interactive
 
-`<vocalis-flyer>` — an interactive concert "flyer" for [tonvereinvocalis.ch](https://tonvereinvocalis.ch): an A4 flyer that folds into a paper plane, which you then fly through a Flappy Bird–style obstacle course. Shipped as a web component, embedded in Webstudio, hosted as an assets-only Cloudflare Worker.
+`<vocalis-flyer-interaktiv>` — an interactive concert "flyer" for [tonvereinvocalis.ch](https://tonvereinvocalis.ch): an A4 flyer that folds into a paper plane, which you then fly through a Flappy Bird–style obstacle course. Shipped as a web component, embedded in Webstudio, hosted as an assets-only Cloudflare Worker.
 
 > Status: first playable version. Placeholder flyer and obstacles, no sounds yet.
 
@@ -23,7 +23,7 @@ Obstacles are objects related to the concert program (TBD).
 
 | Topic | Decision | Why |
 |---|---|---|
-| Packaging | Native Custom Element `<vocalis-flyer>` with shadow DOM | Works in any site via one `<script>` tag. Styles are isolated. |
+| Packaging | Native Custom Element `<vocalis-flyer-interaktiv>` with shadow DOM | Works in any site via one `<script>` tag. Styles are isolated. |
 | UI framework | **No Svelte** | The HTML UI is only a hint, a score, a game-over panel and two buttons. Three.js does the real work. |
 | Rendering | `three` via `three/webgpu` (`WebGPURenderer`) | WebGPU, with automatic WebGL2 fallback |
 | Background | Transparent canvas | Each concert page's Webstudio background shows through |
@@ -42,13 +42,13 @@ package.json          scripts: dev, typecheck, build, preview, deploy
                       deps: three · devDeps: typescript, @types/three, vite, wrangler
 tsconfig.json         strict, noEmit, allowImportingTsExtensions, erasableSyntaxOnly,
                       moduleResolution bundler, types: ["vite/client"]
-vite.config.ts        inputs: index.html (preview site) + src/vocalis-flyer.ts (embed entry)
-                      output entry name stable (vocalis-flyer.js); chunks/assets hashed under assets/
+vite.config.ts        inputs: index.html (preview site) + src/vocalis-flyer-interaktiv.ts (embed entry)
+                      output entry name stable (vocalis-flyer-interaktiv.js); chunks/assets hashed under assets/
 wrangler.jsonc        assets.directory ./dist, preview_urls true, no `main` (assets only)
 .node-version         24
 public/_headers       CORS + cache headers (see Deployment)
 index.html            preview site mimicking a /konzerte/* page (overlaid header, hero, text blocks)
-src/vocalis-flyer.ts  Custom Element: shadow DOM, <img> poster, overlay UI, lazy import('./scene.ts')
+src/vocalis-flyer-interaktiv.ts  Custom Element: shadow DOM, <img> poster, overlay UI, lazy import('./scene.ts')
 src/scene.ts          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
 src/fold.ts           origami data + foldAt(t)
 src/game.ts           pure game logic (no Three.js): physics, spawning, collision, scoring
@@ -124,7 +124,7 @@ Assets-only Worker, deployed from Git. Builds run on Cloudflare.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-/vocalis-flyer.js
+/vocalis-flyer-interaktiv.js
   Cache-Control: public, max-age=300
 ```
 
@@ -137,8 +137,8 @@ Optional later: custom domain (e.g. `interactive.tonvereinvocalis.ch`) if DNS is
 Add an **HTML Embed**, check **Client Only**, and paste:
 
 ```html
-<script type="module" src="https://tonvereinvocalis-interactive.<subdomain>.workers.dev/vocalis-flyer.js"></script>
-<vocalis-flyer style="display:block;width:100%;height:100svh"></vocalis-flyer>
+<script type="module" src="https://tonvereinvocalis-interactive.<subdomain>.workers.dev/vocalis-flyer-interaktiv.js"></script>
+<vocalis-flyer-interaktiv style="display:block;width:100%;height:100svh"></vocalis-flyer-interaktiv>
 ```
 
 ## Development (planned)
@@ -147,7 +147,7 @@ Add an **HTML Embed**, check **Client Only**, and paste:
 pnpm install
 pnpm run dev          # Vite dev server with the preview site (types stripped, not checked)
 pnpm run typecheck    # tsc --noEmit (add --watch while developing)
-pnpm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer.js, assets/, _headers
+pnpm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer-interaktiv.js, assets/, _headers
 pnpm run preview      # build + wrangler dev (serves dist with _headers like production)
 node src/check.ts
 ```
