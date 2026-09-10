@@ -39,12 +39,13 @@ const fireMaterial = (() => {
     0.5,
   )
 
-  // Shape: full width low down, narrowing over FLAME_H to the tip; noise licks tongues above and below it.
-  const halfWidth = mix(float(0.16), float(FLAME_W / 2), soft(0, FLAME_H, below))
+  // Shape: full width low down, narrowing over FLAME_H to the tip and on to a point at the card's top edge, so a tongue
+  // that reaches that far ends pointed instead of being cut off by the card.
+  const halfWidth = mix(float(0.16), float(FLAME_W / 2), soft(0, FLAME_H, below)).mul(soft(-TIP, 0.1, below)).max(0.002)
   // The flame fills almost the whole hitbox width (so what you see is what you hit), hottest in the middle.
   const across = abs(x.add(turbulence.mul(0.1))).div(halfWidth) // 0 in the middle, 1 at the hitbox edge
   const body = float(1).sub(soft(0.6, 1.05, across))
-  const tongues = soft(-0.15, 0.45, below.add(TIP).add(turbulence.mul(0.45)))
+  const tongues = soft(0.05, 0.35, below.add(TIP * 0.6).add(turbulence.mul(0.35))) // mostly end below the card's edge
   const flicker = sin(time.mul(11).add(seed.mul(7))).mul(0.04).add(1)
   const hotCore = float(0.6).add(clamp(float(1).sub(across), 0, 1).mul(0.5))
   const heat = clamp(body.mul(tongues).mul(hotCore).mul(turbulence.mul(0.3).add(0.9)).mul(flicker), 0, 1)
