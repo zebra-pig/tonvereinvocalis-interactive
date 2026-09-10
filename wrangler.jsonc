@@ -1,0 +1,11 @@
+{
+  // Assets-only Worker: serves the Vite build, no Worker script. The name must match the Worker connected in the
+  // Cloudflare dashboard (Workers Builds).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tonvereinvocalis-flyer-interaktiv",
+  "compatibility_date": "2026-09-10",
+  "assets": {
+    "directory": "./dist"
+  },
+  "preview_urls": true
+}

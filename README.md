@@ -44,7 +44,8 @@ tsconfig.json         strict, noEmit, allowImportingTsExtensions, erasableSyntax
                       moduleResolution bundler, types: ["vite/client"]
 vite.config.ts        inputs: index.html (preview site) + src/vocalis-flyer-interaktiv.ts (embed entry)
                       output entry name stable (vocalis-flyer-interaktiv.js); chunks/assets hashed under assets/
-wrangler.jsonc        assets.directory ./dist, preview_urls true, no `main` (assets only)
+wrangler.jsonc        Worker "tonvereinvocalis-flyer-interaktiv" (must match the dashboard), assets.directory ./dist,
+                      preview_urls true, no `main` (assets only)
 .node-version         24
 public/_headers       CORS + cache headers (see Deployment)
 index.html            preview site mimicking a /konzerte/* page (overlaid header, hero, text blocks)
@@ -149,7 +150,7 @@ Optional later: custom domain (e.g. `interactive.tonvereinvocalis.ch`) if DNS is
 Add an **HTML Embed**, check **Client Only**, and paste:
 
 ```html
-<script type="module" src="https://tonvereinvocalis-interactive.<subdomain>.workers.dev/vocalis-flyer-interaktiv.js"></script>
+<script type="module" src="https://tonvereinvocalis-flyer-interaktiv.<subdomain>.workers.dev/vocalis-flyer-interaktiv.js"></script>
 <vocalis-flyer-interaktiv style="display:block;width:100%;height:100svh"></vocalis-flyer-interaktiv>
 ```
 
