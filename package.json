@@ -5,12 +5,15 @@
   "packageManager": "pnpm@10.20.0",
   "scripts": {
     "dev": "vite",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "perf": "node scripts/perf.ts"
   },
   "devDependencies": {
+    "@types/node": "^24.13.4",
     "@types/three": "0.185.4",
+    "lil-gui": "^0.21.0",
     "playwright": "^1.63.0",
     "typescript": "7.0.2",
     "vite": "8.3.0",

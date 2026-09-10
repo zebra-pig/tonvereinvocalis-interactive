@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu'
 import { createAudio } from './audio.ts'
+import type { DebugPane } from './debug.ts'
 import { createPaper, SHEET_H, SHEET_W } from './fold.ts'
 import { createGame, DT, flap, type Obstacle, pitch, resize, step, WORLD_H } from './game.ts'
 import { createObstacleView, type ObstacleView } from './obstacles/index.ts'
@@ -213,6 +214,14 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     { signal },
   )
 
+  // Dev server only (stripped from builds): lil-gui pane with debug toggles such as hitboxes.
+  let debug: DebugPane | undefined
+  if (import.meta.env.DEV) {
+    void import('./debug.ts').then(({ debugPane }) => {
+      if (!signal.aborted) debug = debugPane(scene)
+    })
+  }
+
   // Loop
   function frame(now: number): void {
     const dt = Math.min((now - last) / 1000, 0.1)
@@ -286,6 +295,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
       view.update(now / 1000)
     }
 
+    debug?.draw(game, f === 1)
     renderer.render(scene, camera)
     poster.hidden = true // only now, so a background tab keeps showing the flyer image until the first frame
   }
@@ -324,5 +334,6 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     void renderer.setAnimationLoop(null)
     renderer.dispose()
     audio.dispose()
+    debug?.dispose()
   }
 }

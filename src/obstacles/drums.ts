@@ -134,20 +134,21 @@ function build(parts: [THREE.BufferGeometry, Fill][]): THREE.BufferGeometry {
 }
 
 type UV = [number, number]
-const quad2 = (a: UV, b: UV, c: UV, d: UV): UV[][] => [[a, b, c], [a, c, d]]
-const rect = (u0: number, v0: number, u1: number, v1: number) => quad2([u0, v0], [u1, v0], [u1, v1], [u0, v1])
 
-// A Baslerstab-like crozier: staff, knob, crook curling to the left, three prongs at the foot. (u right, v up)
-const crozier = (() => {
-  const tris = [...rect(-0.017, -0.16, 0.017, 0.07), ...rect(-0.04, 0.03, 0.04, 0.055), ...rect(-0.045, -0.17, 0.045, -0.145)]
-  for (const u of [-0.03, 0, 0.03]) tris.push([[u - 0.014, -0.17], [u + 0.014, -0.17], [u, u === 0 ? -0.24 : -0.215]])
-  const at = (r: number, a: number): UV => [-0.045 + Math.cos(a) * r, 0.07 + Math.sin(a) * r]
-  for (let i = 0; i < 7; i++) {
-    const [a0, a1] = [i, i + 1].map((k) => (k / 7) * Math.PI * 1.15)
-    tris.push(...quad2(at(0.028, a0), at(0.062, a0), at(0.062, a1), at(0.028, a1)))
-  }
-  return tris.map((tri) => tri.map(([u, v]): UV => [(u + 0.03) * 1.25, (v + 0.054) * 1.25]))
-})()
+// The real Baslerstab, from the Basel-Stadt coat of arms (Wikimedia Commons "Wappen Basel-Stadt matt.svg", public
+// domain): its path flattened to polygons, namely three bands, the staff with its three-pointed foot, and the crook
+// with its curl. u right, v up, centred, 0.46 tall.
+const BASLERSTAB = [
+  [-0.0437,0.0384,0.1142,0.0384,0.1186,0.0377,0.1224,0.0358,0.1254,0.0329,0.1274,0.0292,0.1281,0.0249,0.1274,0.0207,0.1254,0.0169,0.1224,0.014,0.1186,0.012,0.1142,0.0113,-0.0435,0.0113,-0.0437,0.0113,-0.048,0.012,-0.0518,0.014,-0.0547,0.0169,-0.0566,0.0207,-0.0573,0.0249,-0.0566,0.0292,-0.0547,0.0329,-0.0518,0.0358,-0.048,0.0377],
+  [-0.0366,0.0518,-0.0363,0.0492,-0.0352,0.0469,-0.0336,0.0451,-0.0315,0.044,-0.0291,0.0436,0.0994,0.0436,0.1018,0.044,0.1038,0.0451,0.1055,0.0469,0.1066,0.0492,0.107,0.0518,0.1066,0.0544,0.1055,0.0566,0.1038,0.0584,0.1018,0.0596,0.0994,0.06,-0.0291,0.06,-0.0315,0.0596,-0.0336,0.0584,-0.0352,0.0566,-0.0363,0.0544],
+  [0.1063,0.0063,-0.0361,0.0063,-0.0387,0.0059,-0.041,0.0047,-0.0428,0.0029,-0.044,0.0007,-0.0445,-0.0018,-0.044,-0.0044,-0.0428,-0.0067,-0.041,-0.0085,-0.0387,-0.0097,-0.0361,-0.0102,0.1063,-0.0102,0.1089,-0.0097,0.1112,-0.0085,0.1131,-0.0067,0.1143,-0.0044,0.1147,-0.0018,0.1143,0.0007,0.1131,0.0029,0.1112,0.0047,0.1089,0.0059],
+  [0.1008,-0.0147,-0.0306,-0.0147,-0.0649,-0.2293,-0.0063,-0.1856,0.0352,-0.23,0.077,-0.1856,0.1355,-0.2293],
+  [-0.0341,0.1181,-0.0358,0.1285,-0.0401,0.1363,-0.0459,0.1416,-0.0521,0.1447,-0.0576,0.1457,-0.0628,0.1451,-0.0673,0.1433,-0.071,0.1404,-0.0738,0.1365,-0.0755,0.1317,-0.0716,0.1317,-0.0685,0.1306,-0.0663,0.1287,-0.0649,0.1263,-0.0644,0.1235,-0.065,0.1194,-0.0665,0.1166,-0.0686,0.1149,-0.0711,0.114,-0.0736,0.1138,-0.0792,0.1149,-0.0832,0.1179,-0.0859,0.1223,-0.0874,0.1275,-0.0879,0.1329,-0.0871,0.1378,-0.084,0.1454,-0.0777,0.1536,-0.0674,0.1601,-0.052,0.1628,-0.0395,0.1599,-0.0284,0.1519,-0.0195,0.1397,-0.0135,0.1246,-0.0114,0.1076,-0.0118,0.0952,-0.0128,0.0837,-0.014,0.074,-0.015,0.0675,-0.0154,0.065,0.0858,0.065,0.0796,0.1229,0.0622,0.1689,0.0352,0.2025,0.0005,0.223,-0.0402,0.23,-0.066,0.2264,-0.0917,0.2157,-0.1139,0.1982,-0.1295,0.1742,-0.1355,0.1438,-0.1329,0.123,-0.1256,0.1047,-0.1146,0.0902,-0.1006,0.0807,-0.0846,0.0772,-0.0634,0.0794,-0.0489,0.0862,-0.0399,0.0961,-0.0354,0.1073],
+]
+const baslerstab: UV[][] = BASLERSTAB.flatMap((flat) => {
+  const outline = Array.from({ length: flat.length / 2 }, (_, i) => new THREE.Vector2(flat[i * 2], flat[i * 2 + 1]))
+  return THREE.ShapeUtils.triangulateShape(outline, []).map((face) => face.map((i): UV => [outline[i].x, outline[i].y]))
+})
 
 function onShell(shape: UV[][], angle: number, radius: number): THREE.BufferGeometry {
   return triangles(shape.map((tri) => tri.map(([u, v]): V3 => [Math.sin(angle + u / radius) * radius, v, Math.cos(angle + u / radius) * radius])))
@@ -157,7 +158,7 @@ function onShell(shape: UV[][], angle: number, radius: number): THREE.BufferGeom
 const drumGeometry = (() => {
   const parts: [THREE.BufferGeometry, Fill][] = []
   parts.push([new THREE.CylinderGeometry(SHELL_R, SHELL_R, H - 2 * HOOP_H + 0.02, SEGMENTS, 1, true), (t) => (Math.floor(t / 2) % 2 ? SHELL_B : SHELL_A)])
-  for (const angle of [Math.PI / 2, -Math.PI / 2]) parts.push([onShell(crozier, angle, SHELL_R + 0.003), () => MARK])
+  for (const angle of [Math.PI / 2, -Math.PI / 2]) parts.push([onShell(baslerstab, angle, SHELL_R + 0.003), () => MARK])
   for (const s of [1, -1]) {
     parts.push([new THREE.CircleGeometry(R - 0.03, SEGMENTS).rotateX(-s * Math.PI / 2).translate(0, s * (H / 2 - 0.015), 0), () => HEAD])
     parts.push([new THREE.CylinderGeometry(R, R, HOOP_H, SEGMENTS, 1, true).translate(0, s * (H / 2 - HOOP_H / 2), 0), (t) => (t % 2 ? HOOP_A : HOOP_B)])

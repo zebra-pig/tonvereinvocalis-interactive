@@ -51,6 +51,7 @@ index.html            preview site mimicking a /konzerte/* page (overlaid header
 src/vocalis-flyer-interaktiv.ts  Custom Element: shadow DOM, <img> poster, overlay UI, lazy import('./scene.ts')
 src/scene.ts          renderer, camera, paper plane, state machine, input, render loop
 src/audio.ts          sound effects (Web Audio) and mute
+src/debug.ts          dev server only: lil-gui "Debug" pane (top right), e.g. "Show hitboxes"; never in builds
 src/storage.ts        localStorage wrapper (best score, mute)
 src/fold.ts           origami data + foldAt(t)
 src/game.ts           pure game logic (no Three.js): physics, spawning, hitboxes, wind, scoring
@@ -58,6 +59,8 @@ src/obstacles/        one file per obstacle kind: drums, matterhorn, fire, wind,
                       index.ts builds the view for an obstacle, geometry.ts holds shared model helpers
 src/**/*.test.ts      Vitest tests next to the code they cover (`pnpm test`)
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
+scripts/perf.ts       `pnpm run perf [--device phone|desktop] [--cpu 4] [--seconds 30]`: plays the game in headless
+                      Chrome on an instrumented production build and prints ranked, actionable performance insights
 ```
 
 ## Component behaviour
