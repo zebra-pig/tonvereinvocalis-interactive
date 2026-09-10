@@ -31,24 +31,28 @@ Obstacles are objects related to the concert program (TBD).
 | Artwork | Our own. No original Flappy Bird sprites. | The reference repo has no license, and its sprites are copyrighted |
 | High score | `localStorage` (wrapped in try/catch) | Keeps the Worker assets-only |
 | Language | German in-game text | Matches the site |
+| Language | TypeScript, `strict: true` | Vite only strips types and never type-checks, so `npm run build` runs `tsc --noEmit` first. A type error fails the build, and with it the Cloudflare deploy. |
 | Dev / build | Vite | Dev server + multi-entry build |
 | Hosting | Cloudflare Worker, static assets only, git-connected Workers Builds | Builds run on Cloudflare |
 
 ## Planned file layout
 
 ```
-package.json          scripts: dev, build, preview, deploy · deps: three · devDeps: vite, wrangler
-vite.config.js        inputs: index.html (preview site) + src/vocalis-flyer.js (embed entry)
-                      entry file name stable (vocalis-flyer.js); chunks/assets hashed under assets/
+package.json          scripts: dev, typecheck, build, preview, deploy
+                      deps: three · devDeps: typescript, @types/three, vite, wrangler
+tsconfig.json         strict, noEmit, allowImportingTsExtensions, erasableSyntaxOnly,
+                      moduleResolution bundler, types: ["vite/client"]
+vite.config.ts        inputs: index.html (preview site) + src/vocalis-flyer.ts (embed entry)
+                      output entry name stable (vocalis-flyer.js); chunks/assets hashed under assets/
 wrangler.jsonc        assets.directory ./dist, preview_urls true, no `main` (assets only)
 .node-version         24
 public/_headers       CORS + cache headers (see Deployment)
 index.html            preview site mimicking a /konzerte/* page (overlaid header, hero, text blocks)
-src/vocalis-flyer.js  Custom Element: shadow DOM, <img> poster, overlay UI, lazy import('./scene.js')
-src/scene.js          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
-src/fold.js           origami data + foldAt(t)
-src/game.js           pure game logic (no Three.js): physics, spawning, collision, scoring
-src/game.check.js     `node src/game.check.js` — assert-based self-check of game logic
+src/vocalis-flyer.ts  Custom Element: shadow DOM, <img> poster, overlay UI, lazy import('./scene.ts')
+src/scene.ts          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
+src/fold.ts           origami data + foldAt(t)
+src/game.ts           pure game logic (no Three.js): physics, spawning, collision, scoring
+src/game.check.ts     `node src/game.check.ts` (Node 24 strips types natively) — assert-based self-check
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 ```
 
@@ -82,7 +86,7 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 - **Accessibility:** `prefers-reduced-motion` makes the fold instant. The canvas has an `aria-label`.
 - **Placeholder artwork:** until `flyer-front.*` exists, a generated A4 texture with a "FLYER" title is used.
 
-## Fold (`src/fold.js`)
+## Fold (`src/fold.ts`)
 
 - The A4 sheet (210×297) is pre-split into flat polygon faces along every crease. UVs are the flat coordinates, so the flyer artwork stays on the paper through every fold. The back side uses `flyer-back.*` or plain paper.
 - Steps follow the [tutorial](https://einfach-basteln.com/weltrekord/), skipping the crease-and-unfold steps:
@@ -142,11 +146,14 @@ Add an **HTML Embed**, check **Client Only**, and paste:
 
 ```sh
 npm install
-npm run dev          # Vite dev server with the preview site
-npm run build        # dist/: index.html, vocalis-flyer.js, assets/, _headers
+npm run dev          # Vite dev server with the preview site (types stripped, not checked)
+npm run typecheck    # tsc --noEmit (add --watch while developing)
+npm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer.js, assets/, _headers
 npm run preview      # build + wrangler dev (serves dist with _headers like production)
-node src/game.check.js
+node src/game.check.ts
 ```
+
+Type errors never reach production: Workers Builds runs `npm run build`, which stops at `tsc`.
 
 **Manual checks:**
 - Fold, fly, crash, retry and unfold.
