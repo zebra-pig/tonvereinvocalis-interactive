@@ -78,21 +78,35 @@ export class VocalisFlyerInteraktiv extends HTMLElement {
     this.#dispose = undefined
   }
 
-  // Shows the flyer as a plain image right away, then swaps in the lazy-loaded 3D scene.
-  async #start(): Promise<void> {
+  // Shows the flyer as a plain image right away, then swaps in the lazy-loaded 3D scene. If the GPU device gets lost
+  // (broken WebGPU drivers), it starts over once on WebGL 2.
+  async #start(forceWebGL = false): Promise<void> {
     const poster = this.#root.querySelector<HTMLImageElement>('.poster')!
     const url = frontUrl ?? (await placeholderFlyer())
     poster.src = url
+    poster.hidden = false
     try {
       const { start } = await import('./scene.ts')
       if (!this.#connected) return
-      const dispose = await start(this, this.#root, url)
+      const dispose = await start(this, this.#root, url, forceWebGL)
       if (!this.#connected) return dispose()
       this.#dispose = dispose
+      if (!forceWebGL) this.addEventListener('gpulost', () => this.#restartOnWebGL(), { once: true })
     } catch (error) {
       console.warn('[vocalis-flyer-interaktiv] 3D unavailable, showing the static flyer', error)
       this.removeAttribute('state')
     }
+  }
+
+  #restartOnWebGL(): void {
+    if (!this.#connected || !this.#dispose) return // a listener left over from an earlier connection
+    console.warn('[vocalis-flyer-interaktiv] GPU device lost, starting over on WebGL 2')
+    this.#dispose?.()
+    this.#dispose = undefined
+    const canvas = this.#root.querySelector('canvas')!
+    canvas.replaceWith(canvas.cloneNode()) // a canvas keeps its first context type, WebGL needs a fresh one
+    this.setAttribute('state', 'flyer')
+    void this.#start(true)
   }
 }
 

@@ -3,7 +3,7 @@
 // bottom edge down; each phone's tilt is accounted for so the pile's top sits exactly at the gap.
 import * as THREE from 'three/webgpu'
 import { PHONES_R } from '../game.ts'
-import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
+import { type Disposable, FAR, instances, merge, type Paint, paint } from './geometry.ts'
 
 /** Portrait geometry centred on its bounds, front facing +z. */
 type Model = { geometry: THREE.BufferGeometry; length: number; width: number }
@@ -119,10 +119,9 @@ export function phonePile(gapBottom: number, random: () => number, disposables: 
     top = y - halfHeight + 0.02 // rest slightly into the phone below
   }
   for (const [model, matrices] of placements) {
-    const mesh = new THREE.InstancedMesh(model.geometry, paint, matrices.length)
+    const mesh = instances(model.geometry, paint, matrices.length, 16, disposables)
     matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix))
     group.add(mesh)
-    disposables.push(mesh)
   }
   return group
 }

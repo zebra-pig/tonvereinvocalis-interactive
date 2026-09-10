@@ -64,3 +64,22 @@ describe('obstacle models match their hitboxes', () => {
     }
   }
 })
+
+it('reuses instanced meshes once a view is disposed (a new one would mean a new shader build)', () => {
+  const meshes = (view: ReturnType<typeof createObstacleView>) => {
+    const found: THREE.InstancedMesh[] = []
+    view.group.traverse((object) => void (object instanceof THREE.InstancedMesh && found.push(object)))
+    return found
+  }
+  const o: Obstacle = { x: 0, gapY: 0, seed: 0.5, passed: false, top: 'drums', bottom: 'tires', wind: false }
+  const first = createObstacleView(o)
+  const before = meshes(first)
+  const busy = createObstacleView(o)
+  const during = meshes(busy)
+  expect(during.some((mesh) => before.includes(mesh))).toBe(false) // borrowed meshes are not shared
+  first.dispose() // disposing detaches the meshes, so collect them before
+  busy.dispose()
+  const again = createObstacleView(o)
+  expect(meshes(again).every((mesh) => before.includes(mesh) || during.includes(mesh))).toBe(true)
+  again.dispose()
+})

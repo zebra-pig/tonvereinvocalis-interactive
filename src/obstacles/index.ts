@@ -56,9 +56,8 @@ export function createObstacleView(o: Obstacle): ObstacleView {
   if (o.bottom === 'tires') bottom.add(tireStack(gapBottom, random, disposables))
 
   if (o.wind) {
-    const zone = leafZone(-FAR, o.top ? gapTop : FAR, random) // wind columns never have a bottom part
+    const zone = leafZone(-FAR, o.top ? gapTop : FAR, random, disposables) // wind columns never have a bottom part
     wind.add(zone.mesh)
-    disposables.push(zone.mesh)
     updates.push(zone.update)
   }
 

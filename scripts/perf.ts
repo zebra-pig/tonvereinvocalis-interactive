@@ -54,6 +54,8 @@ const { values: arg } = parseArgs({
     cpu: { type: 'string' },
     seconds: { type: 'string', default: '30' },
     seed: { type: 'string', default: '7' },
+    webgl: { type: 'boolean', default: false }, // force the WebGL 2 backend
+    swiftshader: { type: 'boolean', default: false }, // only a software WebGPU adapter, like machines without GPU support
   },
 })
 const DEVICES: Record<string, { width: number; height: number; scale: number; mobile: boolean; cpu: number }> = {
@@ -69,7 +71,7 @@ const FRAME = 1000 / 60
 const LONG = 25 // ms: a frame this long is a visible stutter
 const root = fileURLToPath(new URL('..', import.meta.url))
 const out = `${root}node_modules/.perf/`
-const name = `${arg.device}-cpu${cpu}`
+const name = `${arg.device}-cpu${cpu}${arg.webgl ? '-webgl' : ''}${arg.swiftshader ? '-swiftshader' : ''}`
 mkdirSync(out, { recursive: true })
 
 // Instrumentation, as virtual modules swapped in at build time (plain JS, it runs in the bundle).
@@ -91,7 +93,7 @@ const describe = (ro) => {
 }
 export class WebGPURenderer extends T.WebGPURenderer {
   constructor(parameters) {
-    super({ ...parameters, trackTimestamp: true })
+    super({ ...parameters, trackTimestamp: true${arg.webgl ? ', forceWebGL: true' : ''} })
     this.perfFrames = 0
   }
   async init() {
@@ -183,7 +185,10 @@ const input = { index: 'index.html', 'vocalis-flyer-interaktiv': 'src/vocalis-fl
 await build({ root, logLevel: 'warn', plugins: [instrument], build: { outDir, emptyOutDir: true, minify: false, rolldownOptions: { input } } })
 const server = await preview({ root, logLevel: 'warn', build: { outDir } })
 
-const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-webgpu'] })
+const browser = await chromium.launch({
+  channel: 'chrome',
+  args: ['--enable-unsafe-webgpu', ...(arg.swiftshader ? ['--use-webgpu-adapter=swiftshader'] : [])],
+})
 const context = await browser.newContext({
   viewport: { width, height },
   deviceScaleFactor: device.scale,

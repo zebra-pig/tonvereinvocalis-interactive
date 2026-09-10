@@ -1,9 +1,9 @@
 // Stage lights: a truss drop from above the screen with PAR cans clamped on, and a moving head at its lower end.
 // Hitbox: half-width LIGHTS_R from the gap's top edge up. The soft beams are decorative (userData.decorative).
 import * as THREE from 'three/webgpu'
-import { color, float, mix, normalView, positionViewDirection, smoothstep, uv } from 'three/tsl'
+import { color, float, materialColor, mix, normalView, positionViewDirection, smoothstep, uv } from 'three/tsl'
 import type { Node } from 'three/webgpu'
-import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
+import { type Disposable, FAR, instances, merge, type Paint, paint } from './geometry.ts'
 
 const SECTION = 0.3 // truss section length
 const HALF = 0.13 // half the truss cross-section
@@ -64,15 +64,19 @@ const beamGeometry = new THREE.CylinderGeometry(0.1, 0.6, BEAM, 20, 1, true).tra
 // Soft beam: open cone, normal alpha blending (additive would vanish on a light page), fading towards its far end
 // and its silhouette edges.
 const soft = (from: number, to: number, x: Node<'float'>) => smoothstep(float(from), float(to), x)
+// One node graph for every beam; the tint comes from each material's colour, so all tints share one shader and pipeline.
+const along = uv().y // 1 at the lens, 0 at the far end
+const facing = normalView.dot(positionViewDirection).abs() // 1 across the middle, 0 at the silhouette
+const beamColor = mix(materialColor, color(0xffffff), soft(0.8, 1, along).mul(0.6))
+const beamOpacity = soft(0.05, 0.7, facing).mul(along).mul(0.35)
 const beamMaterials = new Map<string, THREE.MeshBasicNodeMaterial>()
 function beamMaterial(tint: string): THREE.MeshBasicNodeMaterial {
   const cached = beamMaterials.get(tint)
   if (cached) return cached
-  const along = uv().y // 1 at the lens, 0 at the far end
-  const facing = normalView.dot(positionViewDirection).abs() // 1 across the middle, 0 at the silhouette
-  const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide })
-  material.colorNode = mix(color(new THREE.Color(tint)), color(0xffffff), soft(0.8, 1, along).mul(0.6))
-  material.opacityNode = soft(0.05, 0.7, facing).mul(along).mul(0.35)
+  // Single pass: a faint cone looks the same, and compileAsync can warm it up (see the glow material in fire.ts).
+  const material = new THREE.MeshBasicNodeMaterial({ color: tint, transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true })
+  material.colorNode = beamColor
+  material.opacityNode = beamOpacity
   beamMaterials.set(tint, material)
   return material
 }
@@ -83,7 +87,7 @@ export function stageLights(gapTop: number, random: () => number, disposables: D
   const pick = <T>(options: T[]) => options[Math.floor(random() * options.length)]
 
   const sections = Math.max(1, Math.ceil((FAR + 0.3 - trussBottom) / SECTION))
-  const truss = new THREE.InstancedMesh(random() < 0.6 ? TRUSSES[0] : TRUSSES[1], paint, sections)
+  const truss = instances(random() < 0.6 ? TRUSSES[0] : TRUSSES[1], paint, sections, 32, disposables)
   for (let i = 0; i < sections; i++) truss.setMatrixAt(i, new THREE.Matrix4().makeTranslation(0, trussBottom + i * SECTION, 0))
 
   // PAR cans alternate sides and aim down and outwards, tipped towards the camera so the lenses show.
@@ -92,10 +96,10 @@ export function stageLights(gapTop: number, random: () => number, disposables: D
   for (let y = trussBottom + 0.45; y < FAR; y += SPACING, side = -side) {
     fixtures.push(place(side * 0.2, y, 0.05, 0.45 + random() * 0.3, side * (0.2 + random() * 0.25)))
   }
-  const cans = new THREE.InstancedMesh(parGeometry, paint, fixtures.length)
+  const cans = instances(parGeometry, paint, fixtures.length, 16, disposables)
   fixtures.forEach((matrix, i) => cans.setMatrixAt(i, matrix))
 
-  const lenses = new THREE.InstancedMesh(lensGeometry, lensMaterial, fixtures.length)
+  const lenses = instances(lensGeometry, lensMaterial, fixtures.length, 16, disposables)
   const tint = new THREE.Color()
   const tints = fixtures.map((matrix, i) => {
     const name = pick(COLORS)
@@ -122,7 +126,6 @@ export function stageLights(gapTop: number, random: () => number, disposables: D
     canBeam.applyMatrix4(fixtures[0])
     group.add(canBeam)
   }
-  disposables.push(truss, cans, lenses)
 
   const pan = random() * Math.PI * 2
   const tilt = random() * Math.PI * 2

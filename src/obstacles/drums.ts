@@ -4,7 +4,7 @@ import * as THREE from 'three/webgpu'
 import { attribute, clamp, select, uniformArray, varyingProperty } from 'three/tsl'
 import type { Node } from 'three/webgpu'
 import { DRUM_H, DRUM_R } from '../game.ts'
-import { type Disposable, FAR, merge, type Paint, paint, triangles, type V3 } from './geometry.ts'
+import { type Disposable, FAR, instances, merge, type Paint, paint, triangles, type V3 } from './geometry.ts'
 
 const LIMIT = DRUM_R + 0.085 // max |x| of any drum vertex (the hitbox slack is 0.1)
 const R = DRUM_R // hoop radius
@@ -473,12 +473,11 @@ export function drumStack(gapBottom: number, random: () => number, disposables: 
 }
 
 function drums(matrices: THREE.Matrix4[], styles: THREE.Color[], disposables: Disposable[]): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(drumGeometry, drumMaterial, matrices.length)
+  const mesh = instances(drumGeometry, drumMaterial, matrices.length, 16, disposables)
   matrices.forEach((matrix, i) => {
     mesh.setMatrixAt(i, matrix)
     mesh.setColorAt(i, styles[i])
   })
-  disposables.push(mesh)
   return mesh
 }
 

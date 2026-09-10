@@ -7,7 +7,7 @@ import * as THREE from 'three/webgpu'
 import { abs, clamp, color, float, mix, modelPosition, mx_fractal_noise_float, positionWorld, sin, smoothstep, time, vec3 } from 'three/tsl'
 import type { Node } from 'three/webgpu'
 import { FLAME_H, FLAME_W } from '../game.ts'
-import { type Disposable, FAR } from './geometry.ts'
+import { type Disposable, FAR, instances } from './geometry.ts'
 
 const TIP = 0.35 // flame tongues flicker this far above the hitbox tip
 const CARD_W = 1.28 // the flame fades out well inside the card
@@ -17,6 +17,9 @@ const glow = {
   transparent: true,
   depthWrite: false,
   side: THREE.DoubleSide,
+  // Flat cards: a back pass adds nothing. And three r185's compileAsync warms double-pass materials with the wrong side
+  // in their cache key, so they would compile again when the first fire shows up.
+  forceSinglePass: true,
   blending: THREE.CustomBlending,
   blendSrc: THREE.OneFactor, // colour is added as is ...
   blendDst: THREE.OneMinusSrcAlphaFactor, // ... while only the coverage hides the page behind
@@ -79,8 +82,7 @@ export function fire(gapBottom: number, random: () => number, disposables: Dispo
   card.scale.y = gapBottom + TIP + FAR
   card.renderOrder = 5
 
-  const embers = new THREE.InstancedMesh(emberGeometry, emberMaterial, EMBERS)
-  embers.frustumCulled = false
+  const embers = instances(emberGeometry, emberMaterial, EMBERS, EMBERS, disposables)
   embers.renderOrder = 6
   embers.userData.decorative = true
   const sparks = Array.from({ length: EMBERS }, () => ({
@@ -109,6 +111,5 @@ export function fire(gapBottom: number, random: () => number, disposables: Dispo
   update(0)
 
   group.add(card, embers)
-  disposables.push(embers)
   return { group, update }
 }

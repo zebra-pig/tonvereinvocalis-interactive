@@ -1,7 +1,7 @@
 // Car tyres piled up: flat stack, sometimes one tyre leaning on top, some still on their wheel. Hitbox: half-width
 // TIRE_R from the gap's bottom edge down.
 import * as THREE from 'three/webgpu'
-import { type Disposable, FAR, merge, type Paint, paint } from './geometry.ts'
+import { type Disposable, FAR, instances, merge, type Paint, paint } from './geometry.ts'
 
 const OUTER = 0.55
 const HALF = 0.175 // half the tyre width
@@ -57,13 +57,12 @@ export function tireStack(gapBottom: number, random: () => number, disposables: 
   const tint = new THREE.Color()
   for (const [geometry, matrices] of [[tyreGeometry, piles.tyres], [wheelGeometry, piles.wheels]] as const) {
     if (!matrices.length) continue
-    const mesh = new THREE.InstancedMesh(geometry, paint, matrices.length)
+    const mesh = instances(geometry, paint, matrices.length, 32, disposables)
     matrices.forEach((matrix, i) => {
       mesh.setMatrixAt(i, matrix)
       mesh.setColorAt(i, tint.setRGB(1, 0.97 + random() * 0.03, 0.9 + random() * 0.1).multiplyScalar(0.85 + random() * 0.15)) // worn, dusty
     })
     group.add(mesh)
-    disposables.push(mesh)
   }
   return group
 }

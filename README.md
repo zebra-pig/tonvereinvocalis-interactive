@@ -25,7 +25,7 @@ Obstacles are objects related to the concert program (TBD).
 |---|---|---|
 | Packaging | Native Custom Element `<vocalis-flyer-interaktiv>` with shadow DOM | Works in any site via one `<script>` tag. Styles are isolated. |
 | UI framework | **No Svelte** | The HTML UI is only a hint, a score, a game-over panel and two buttons. Three.js does the real work. |
-| Rendering | `three` via `three/webgpu` (`WebGPURenderer`) | WebGPU, with automatic WebGL2 fallback |
+| Rendering | `three` via `three/webgpu` (`WebGPURenderer`) | WebGPU only on a hardware adapter, else WebGL2 (software/compatibility adapters are unusably slow); a lost GPU device restarts once on WebGL2. Obstacle `InstancedMesh`es are pooled (`instances()` in `obstacles/geometry.ts`), since each new one costs a shader build. |
 | Background | Transparent canvas | Each concert page's Webstudio background shows through |
 | First paint | Front artwork is shown as `<img>` right away. The Three.js scene is lazy-loaded with `import()`. | Fast hero. The `<img>` stays as the fallback if the renderer can't start. |
 | Artwork | Our own. No original Flappy Bird sprites. | The reference repo has no license, and its sprites are copyrighted |

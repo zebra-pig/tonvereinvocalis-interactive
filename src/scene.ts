@@ -27,11 +27,34 @@ const smooth = (t: number) => t * t * (3 - 2 * t)
 const clamp01 = (t: number) => Math.min(Math.max(t, 0), 1)
 const bob = (now: number) => Math.sin(now / 400) * 0.15
 
-/** Mounts the 3D flyer into the element's shadow root. Resolves to a dispose function. */
-export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: string): Promise<() => void> {
+// WebGPU only on a hardware adapter. Without one, three still asks for a compatibility adapter and may get a software
+// or broken one (seen on Linux Chrome, and with SwiftShader): ~10 fps, or failed GPU buffers and shader rebuilds every
+// frame. WebGL 2 is far faster there.
+async function hardwareWebGPU(): Promise<boolean> {
+  type Adapter = { info?: { architecture?: string; isFallbackAdapter?: boolean } }
+  const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<Adapter | null> } }).gpu
+  try {
+    const adapter = await gpu?.requestAdapter()
+    return !!adapter && !adapter.info?.isFallbackAdapter && adapter.info?.architecture !== 'swiftshader'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Mounts the 3D flyer into the element's shadow root. Resolves to a dispose function. Dispatches `gpulost` on the host
+ * if the GPU device is lost, so the element can start over on WebGL 2.
+ */
+export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: string, forceWebGL = false): Promise<() => void> {
   const $ = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector)!
 
-  const renderer = new THREE.WebGPURenderer({ canvas: $<HTMLCanvasElement>('canvas'), antialias: true, alpha: true })
+  const renderer = new THREE.WebGPURenderer({
+    canvas: $<HTMLCanvasElement>('canvas'),
+    antialias: true,
+    alpha: true,
+    forceWebGL: forceWebGL || !(await hardwareWebGPU()),
+  })
+  renderer.onDeviceLost = () => host.dispatchEvent(new Event('gpulost'))
   await renderer.init()
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
   renderer.setClearColor(0x000000, 0)
@@ -90,7 +113,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   // Compile every obstacle's shaders up front, so the first fire doesn't stutter mid-flight.
   const tops = ['drums', 'lights', 'controllers'] as const
   const warmups = (['drums', 'matterhorn', 'fire', 'phones', 'tires'] as const).map((bottom, i) => {
-    const view = createObstacleView({ x: 0, gapY: 0, top: tops[i % tops.length], bottom, wind: i === 0, seed: 0.5, passed: false })
+    const view = createObstacleView({ x: 0, gapY: 0, top: tops[i % tops.length], bottom, wind: i === 0, seed: (i + 0.5) / 5, passed: false }) // varied seeds: more model variants
     scene.add(view.group)
     return view
   })

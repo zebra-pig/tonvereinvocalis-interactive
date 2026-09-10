@@ -19,6 +19,7 @@ export function createAudio() {
     },
     /** Browsers only allow audio after a user gesture, so call this on taps. Loads the samples the first time. */
     unlock(): void {
+      if (Object.keys(sounds).length === 0) return // nothing to play: skip the AudioContext, it stalls the first tap by ~0.3 s
       if (context) return void context.resume()
       const created = (context = new AudioContext())
       for (const [path, url] of Object.entries(sounds)) {

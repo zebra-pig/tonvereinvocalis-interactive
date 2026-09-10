@@ -75,3 +75,46 @@ export function seeded(seed: number): () => number {
   let state = Math.floor(seed * 2147483646) + 1
   return () => (state = (state * 16807) % 2147483647) / 2147483647
 }
+
+// Reusable InstancedMeshes. three r185 keys an InstancedMesh's render object by its uuid, so every new InstancedMesh
+// costs a shader build (on WebGL often a program link too) the first time it renders: one per spawned obstacle. Views
+// borrow meshes here and hand them back when disposed, so builds only happen while a pool grows.
+type Slot = { mesh: THREE.InstancedMesh; free: boolean }
+const pools = new Map<string, Slot[]>()
+
+/** Borrows an InstancedMesh with room for `count` instances; it goes back to the pool with the view's disposables. */
+export function instances(
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  count: number,
+  capacity: number,
+  disposables: Disposable[],
+): THREE.InstancedMesh {
+  const key = `${geometry.uuid}:${material.uuid}`
+  const pool = pools.get(key) ?? []
+  pools.set(key, pool)
+  let slot = pool.find((s) => s.free && s.mesh.instanceMatrix.count >= count)
+  if (!slot) {
+    slot = { mesh: new THREE.InstancedMesh(geometry, material, Math.max(capacity, count)), free: false }
+    slot.mesh.frustumCulled = false // its bounds change with every reuse
+    pool.push(slot)
+  }
+  const taken = slot
+  taken.free = false
+  const mesh = taken.mesh
+  mesh.count = count
+  mesh.position.set(0, 0, 0)
+  mesh.quaternion.identity()
+  mesh.scale.set(1, 1, 1)
+  mesh.renderOrder = 0
+  mesh.userData = {}
+  mesh.instanceMatrix.needsUpdate = true // the borrower writes new matrices (and colours) before the next render
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  disposables.push({
+    dispose() {
+      mesh.removeFromParent()
+      taken.free = true
+    },
+  })
+  return mesh
+}

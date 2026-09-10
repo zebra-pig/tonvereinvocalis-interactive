@@ -1,6 +1,7 @@
 // Updraft: autumn leaves rising, swaying and tumbling. CPU-animated instances, cheap at these counts.
 import * as THREE from 'three/webgpu'
 import { WIND_W } from '../game.ts'
+import { type Disposable, instances } from './geometry.ts'
 
 const leafGeometry = (() => {
   const g = new THREE.BufferGeometry()
@@ -12,11 +13,10 @@ const leafGeometry = (() => {
 const leafMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 0.8, side: THREE.DoubleSide })
 const LEAVES = ['#b83a1b', '#e0701f', '#f2a33a', '#e8c547', '#8b5a2b', '#a0522d']
 
-export function leafZone(bottomY: number, topY: number, random: () => number) {
+export function leafZone(bottomY: number, topY: number, random: () => number, disposables: Disposable[]) {
   const height = topY - bottomY
   const count = Math.round(Math.min(Math.max(height * 5, 12), 50))
-  const mesh = new THREE.InstancedMesh(leafGeometry, leafMaterial, count)
-  mesh.frustumCulled = false
+  const mesh = instances(leafGeometry, leafMaterial, count, 50, disposables)
   const tint = new THREE.Color()
   const leaves = Array.from({ length: count }, (_, i) => {
     mesh.setColorAt(i, tint.set(LEAVES[Math.floor(random() * LEAVES.length)]))
