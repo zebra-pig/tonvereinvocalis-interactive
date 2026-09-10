@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { createPaper, SHEET_H, SHEET_W } from './fold.ts'
-import { createGame, DT, flap, GAP, OBSTACLE_W, pitch, resize, step, WORLD_H } from './game.ts'
+import { createGame, DT, flap, type Obstacle, pitch, resize, step, WORLD_H } from './game.ts'
+import { createObstacleView, type ObstacleView } from './obstacles.ts'
 
 type State = 'flyer' | 'folding' | 'ready' | 'play' | 'over' | 'unfolding'
 
@@ -100,17 +101,22 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   const xAxis = new THREE.Vector3(1, 0, 0)
   const zAxis = new THREE.Vector3(0, 0, 1)
 
-  // Obstacles. Placeholder boxes until the objects from the concert program are decided.
-  const obstacleGeometry = new THREE.BoxGeometry(OBSTACLE_W, WORLD_H, OBSTACLE_W)
-  const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 })
-  const obstacles: THREE.Group[] = []
-  function createObstacle(): THREE.Group {
-    const group = new THREE.Group()
-    const top = new THREE.Mesh(obstacleGeometry, obstacleMaterial)
-    const bottom = new THREE.Mesh(obstacleGeometry, obstacleMaterial)
-    group.add(top, bottom) // positioned in draw()
-    scene.add(group)
-    return group
+  // Obstacles: one view per obstacle, created when it spawns and disposed when it's gone.
+  const views = new Map<Obstacle, ObstacleView>()
+  // Compile every obstacle's shaders up front, so the first fire doesn't stutter mid-flight.
+  const samples = (['drums', 'matterhorn', 'fire'] as const).map((bottom, i): Obstacle => {
+    return { x: (i - 1) * 3, gapY: 0, top: 'drums', bottom, wind: true, seed: 0.5, passed: false }
+  })
+  const warmups = samples.map((sample) => {
+    const view = createObstacleView(sample)
+    view.group.position.x = sample.x
+    scene.add(view.group)
+    return view
+  })
+  await renderer.compileAsync(scene, camera)
+  for (const view of warmups) {
+    scene.remove(view.group)
+    view.dispose()
   }
 
   // State
@@ -307,16 +313,24 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     // Obstacles slide in with the flight (top ones from above, bottom ones from below) and back out when
     // unfolding. After a retry the new ones slide in on their own timer.
     const appear = Math.min(f, clamp01((now - gameStartedAt) / (ENTER_SECONDS * 1000)))
-    game.obstacles.forEach((o, i) => {
-      const group = (obstacles[i] ??= createObstacle())
-      const k = smooth(clamp01(appear * (1 + STAGGER) - STAGGER * clamp01(o.x / worldW + 0.5)))
-      const away = (1 - k) * WORLD_H
-      group.position.set(o.x, o.gapY, 0)
-      group.children[0].position.y = GAP / 2 + WORLD_H / 2 + away
-      group.children[1].position.y = -GAP / 2 - WORLD_H / 2 - away
-      group.visible = k > 0
-    })
-    for (let i = game.obstacles.length; i < obstacles.length; i++) obstacles[i].visible = false
+    const current = new Set(game.obstacles)
+    for (const [o, view] of views) {
+      if (current.has(o)) continue
+      scene.remove(view.group)
+      view.dispose()
+      views.delete(o)
+    }
+    for (const o of game.obstacles) {
+      let view = views.get(o)
+      if (!view) {
+        view = createObstacleView(o)
+        views.set(o, view)
+        scene.add(view.group)
+      }
+      view.group.position.x = o.x
+      view.slide(smooth(clamp01(appear * (1 + STAGGER) - STAGGER * clamp01(o.x / worldW + 0.5))))
+      view.update(now / 1000)
+    }
 
     renderer.render(scene, camera)
     poster.hidden = true // only now, so a background tab keeps showing the flyer image until the first frame

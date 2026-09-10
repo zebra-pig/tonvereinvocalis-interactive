@@ -1,11 +1,20 @@
 // node src/check.ts
 import { createPaper, SHEET_H, SHEET_W } from './fold.ts'
-import { createGame, flap, OBSTACLE_W, step, WORLD_H } from './game.ts'
+import { createGame, DRUM_R, flap, GAP, type Obstacle, step, WORLD_H } from './game.ts'
 
 function assert(ok: boolean, message: string): void {
   if (!ok) throw new Error(`check failed: ${message}`)
 }
 const near = (a: number, b: number) => Math.abs(a - b) < 0.5
+const column = (o: Partial<Obstacle> & { x: number }): Obstacle => ({
+  gapY: 0,
+  top: 'drums',
+  bottom: 'drums',
+  wind: false,
+  seed: 0,
+  passed: false,
+  ...o,
+})
 
 // Game
 {
@@ -24,19 +33,44 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.5
 }
 {
   const game = createGame(10)
-  game.obstacles = [{ x: game.planeX, gapY: 3, passed: false }]
-  assert(step(game).hit, 'flying into an obstacle ends the flight')
+  game.obstacles = [column({ x: game.planeX, gapY: 3 })]
+  assert(step(game).hit, 'flying into a drum stack ends the flight')
 }
 {
   const game = createGame(10)
-  game.obstacles = [{ x: game.planeX, gapY: 0, passed: false }]
+  game.obstacles = [column({ x: game.planeX })]
   assert(!step(game).hit, 'flying through the gap is safe')
 }
 {
   const game = createGame(10)
-  game.obstacles = [{ x: game.planeX - OBSTACLE_W / 2 - 0.37, gapY: 0, passed: false }]
+  game.obstacles = [column({ x: game.planeX - DRUM_R - 0.37 })]
   assert(step(game).scored && game.score === 1, 'passing an obstacle scores once')
   assert(!step(game).scored && game.score === 1, 'no double score')
+}
+{
+  // Summit at y = 0. Beside the summit, above the slope, is air; lower down is rock.
+  const mountain = (y: number) => {
+    const game = createGame(10)
+    game.obstacles = [column({ x: game.planeX - 1.2, gapY: GAP / 2, bottom: 'matterhorn' })]
+    game.y = y
+    return step(game).hit
+  }
+  assert(!mountain(-2), 'the Matterhorn hitbox follows its slope, not a box')
+  assert(mountain(-4.2), 'flying into the Matterhorn slope ends the flight')
+}
+{
+  const game = createGame(10)
+  game.obstacles = [column({ x: game.planeX, gapY: -1, bottom: 'fire' })]
+  game.y = -1 - GAP / 2 - 0.5
+  assert(step(game).hit, 'flying into the fire ends the flight')
+}
+{
+  const game = createGame(10)
+  game.obstacles = [column({ x: game.planeX, top: null, bottom: null, wind: true })]
+  for (let i = 0; i < 30; i++) step(game)
+  assert(game.vy > 0 && game.y > 0, 'an updraft lifts the plane')
+  game.y = WORLD_H / 2 - 0.3
+  assert(step(game).hit, 'being blown off the top ends the flight')
 }
 
 // Fold
