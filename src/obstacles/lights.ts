@@ -77,7 +77,7 @@ function beamMaterial(tint: string): THREE.MeshBasicNodeMaterial {
   return material
 }
 
-export function stageLights(gapTop: number, random: () => number, disposables: Disposable[]): THREE.Group {
+export function stageLights(gapTop: number, random: () => number, disposables: Disposable[]) {
   const group = new THREE.Group()
   const trussBottom = gapTop + HEAD_H
   const pick = <T>(options: T[]) => options[Math.floor(random() * options.length)]
@@ -95,33 +95,58 @@ export function stageLights(gapTop: number, random: () => number, disposables: D
   const cans = new THREE.InstancedMesh(parGeometry, paint, fixtures.length)
   fixtures.forEach((matrix, i) => cans.setMatrixAt(i, matrix))
 
-  const yoke = new THREE.Mesh(yokeGeometry, paint)
-  yoke.position.y = trussBottom
-  const headPose = place(0, trussBottom + HEAD_PIVOT, 0, 0.35 + random() * 0.35, (random() - 0.5) * 0.6)
-  const head = new THREE.Mesh(headGeometry, paint)
-  head.applyMatrix4(headPose)
-
-  const lenses = new THREE.InstancedMesh(lensGeometry, lensMaterial, fixtures.length + 1)
+  const lenses = new THREE.InstancedMesh(lensGeometry, lensMaterial, fixtures.length)
   const tint = new THREE.Color()
-  const tints = [headPose, ...fixtures].map((matrix, i) => {
+  const tints = fixtures.map((matrix, i) => {
     const name = pick(COLORS)
     lenses.setMatrixAt(i, matrix)
     lenses.setColorAt(i, tint.set(name))
     return name
   })
+  group.add(truss, cans, lenses)
 
-  group.add(truss, cans, yoke, head, lenses)
-  // Beams from the moving head and the lowest can only: enough mood, little overdraw.
-  for (const [matrix, name] of [[headPose, tints[0]], [fixtures[0], tints[1]]] as const) {
-    if (!matrix) continue
-    const beam = new THREE.Mesh(beamGeometry, beamMaterial(name))
-    beam.applyMatrix4(matrix)
-    beam.renderOrder = 10
-    beam.userData.decorative = true
-    group.add(beam)
+  // Moving head: the yoke pans around the vertical axis, the head tilts on its axle, lens and beam move with it.
+  // Every part stays within HEAD_H of the truss end, so it never reaches into the gap.
+  const headTint = pick(COLORS)
+  const yoke = new THREE.Group()
+  yoke.position.y = trussBottom
+  const head = new THREE.Group()
+  head.position.y = HEAD_PIVOT
+  head.add(new THREE.Mesh(headGeometry, paint), new THREE.Mesh(lensGeometry, lensFor(headTint)), beam(headTint))
+  yoke.add(new THREE.Mesh(yokeGeometry, paint), head)
+  group.add(yoke)
+
+  // Plus a beam from the lowest can: enough mood, little overdraw.
+  if (fixtures[0]) {
+    const canBeam = beam(tints[0])
+    canBeam.applyMatrix4(fixtures[0])
+    group.add(canBeam)
   }
   disposables.push(truss, cans, lenses)
-  return group
+
+  const pan = random() * Math.PI * 2
+  const tilt = random() * Math.PI * 2
+  const speed = 0.8 + random() * 0.5
+  function update(seconds: number): void {
+    yoke.rotation.y = Math.sin(seconds * 0.6 * speed + pan) * 1.2
+    head.rotation.x = 0.55 + Math.sin(seconds * 0.9 * speed + tilt) * 0.5
+  }
+  update(0)
+  return { group, update }
+}
+
+function beam(tint: string): THREE.Mesh {
+  const mesh = new THREE.Mesh(beamGeometry, beamMaterial(tint))
+  mesh.renderOrder = 10
+  mesh.userData.decorative = true
+  return mesh
+}
+
+const lensMaterials = new Map<string, THREE.MeshBasicMaterial>()
+function lensFor(tint: string): THREE.MeshBasicMaterial {
+  const material = lensMaterials.get(tint) ?? new THREE.MeshBasicMaterial({ color: tint, side: THREE.DoubleSide })
+  lensMaterials.set(tint, material)
+  return material
 }
 
 const euler = new THREE.Euler()

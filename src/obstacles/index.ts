@@ -35,7 +35,11 @@ export function createObstacleView(o: Obstacle): ObstacleView {
   const gapBottom = o.gapY - GAP / 2
 
   if (o.top === 'drums') top.add(hangingDrums(gapTop, random, disposables))
-  if (o.top === 'lights') top.add(stageLights(gapTop, random, disposables))
+  if (o.top === 'lights') {
+    const rig = stageLights(gapTop, random, disposables)
+    top.add(rig.group)
+    updates.push(rig.update)
+  }
   if (o.top === 'controllers') {
     const dangling = controllers(gapTop, random, disposables)
     top.add(dangling.group)
@@ -43,7 +47,11 @@ export function createObstacleView(o: Obstacle): ObstacleView {
   }
   if (o.bottom === 'drums') bottom.add(drumStack(gapBottom, random, disposables))
   if (o.bottom === 'matterhorn') bottom.add(matterhorn(o, gapBottom))
-  if (o.bottom === 'fire') bottom.add(fire(gapBottom, random, disposables))
+  if (o.bottom === 'fire') {
+    const flames = fire(gapBottom, random, disposables)
+    bottom.add(flames.group)
+    updates.push(flames.update)
+  }
   if (o.bottom === 'phones') bottom.add(phonePile(gapBottom, random, disposables))
   if (o.bottom === 'tires') bottom.add(tireStack(gapBottom, random, disposables))
 

@@ -9,9 +9,8 @@ export const GAP = 2.2
 // Obstacle shapes. The scene builds its models from the same numbers, so hitboxes match what you see.
 export const DRUM_R = 0.5
 export const DRUM_H = 0.9
-export const FLAME_H = 2.2
-export const FLAME_W = 1.1 // flame width at its base, it narrows towards the tip
-export const LOGS_W = 1.2
+export const FLAME_H = 2.2 // the fire column narrows over this height towards its tip
+export const FLAME_W = 1.1 // fire column width below that
 export const LIGHTS_R = 0.55 // stage lights on a truss drop
 export const CONTROLLERS_R = 0.5 // game controllers dangling from their cables
 export const PHONES_R = 0.55 // pile of phones
@@ -128,9 +127,9 @@ export function parts(o: Obstacle): V2[][] {
     shapes.push(box(o.x, HALF_WIDTH[o.bottom], -far, bottom))
   }
   if (o.bottom === 'fire') {
-    const flameBase = bottom - FLAME_H
-    shapes.push(box(o.x, LOGS_W / 2, -far, flameBase))
-    shapes.push([[o.x - FLAME_W / 2, flameBase], [o.x + FLAME_W / 2, flameBase], [o.x + 0.18, bottom], [o.x - 0.18, bottom]])
+    const shoulder = bottom - FLAME_H
+    const w = FLAME_W / 2
+    shapes.push([[o.x - w, -far], [o.x + w, -far], [o.x + w, shoulder], [o.x + 0.16, bottom], [o.x - 0.16, bottom], [o.x - w, shoulder]])
   }
   if (o.bottom === 'matterhorn') {
     const s = mountainScale(o)
