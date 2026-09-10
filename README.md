@@ -96,10 +96,11 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
   4. Fold in half.
   5. Wings down.
   6. Wings out flat, which gives the glider shape.
-- Each step is `{ crease: [p1, p2], angle, moving: [faceIds], anchor: faceId }`, with face lists written by hand.
-- `foldAt(t)` rebuilds all face matrices from the flat sheet on every frame. For each step it maps the crease through the anchor face's accumulated matrix, then rotates the moving faces by `angle × stepProgress`. The result is deterministic, and unfolding is the same function run backwards.
-- Layers get tiny static offsets to avoid z-fighting.
-- The final fold state *is* the plane. A camera tween goes from the front view of the flyer to a side view, with no mesh swap.
+- Each step lists its creases (`a → b`, angle) and a start time. The sheet is split along every crease, and whatever lies left of a crease turns with it.
+- Folds overlap slightly and ease in and out, so the motion flows instead of stopping after every fold. Mirrored folds overlap more; the second lands after the first.
+- `foldAt(t)` rebuilds every polygon's transform from the flat sheet on each frame, so unfolding is the same function run backwards.
+- Stacked layers are ordered only where polygons actually overlap, and each is lifted 0.1 mm. The plane reads as one piece, without z-fighting.
+- The final fold state *is* the plane. It then turns nose-right, rolls its wings up and flies in a small arc to its start position, with no mesh swap.
 
 ## Deployment (Cloudflare Workers Builds)
 

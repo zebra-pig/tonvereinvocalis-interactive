@@ -10,14 +10,18 @@ const backUrl = Object.values(
   import.meta.glob<string>('./assets/flyer-back.*', { eager: true, query: '?url', import: 'default' }),
 )[0]
 
-const STEP_SECONDS = 0.45 // per fold
-const FLIGHT_SECONDS = 1 // folded sheet → plane in game position
+const FOLD_SECONDS = 1.5
+const FLIGHT_SECONDS = 0.8 // folded sheet → plane at its start position
+const FLIGHT_ARC = 0.6 // world units the plane rises mid-flight
+const LEAN = 0.35 // radians the sheet leans back while folding, so the folds read in depth
 const PLANE_SCALE = 0.005 // mm → world units, the plane ends up ~1 unit long
 const PLANE_TILT = 0.8 // roll towards the camera so the wings read from the side
 const FOV = 30
 const RETRY_DELAY = 500 // ms, so frantic tapping right after a crash doesn't restart
 
 const smooth = (t: number) => t * t * (3 - 2 * t)
+const clamp01 = (t: number) => Math.min(Math.max(t, 0), 1)
+const bob = (now: number) => Math.sin(now / 400) * 0.15
 
 const storage = {
   get(key: string): string | null {
@@ -82,18 +86,17 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   plane.add(sheet)
   scene.add(plane)
 
-  paper.foldAt(paper.steps)
+  // The plane group turns around the folded plane's centre, so the flight follows a clean path.
+  paper.foldAt(1)
   geometry.computeBoundingBox()
-  const planePivot = geometry.boundingBox!.getCenter(new THREE.Vector3())
-  const flyerPivot = new THREE.Vector3(SHEET_W / 2, SHEET_H / 2, 0)
-  // Sheet axes → game: the nose (sheet +y) flies right, the wings (sheet -z, above the keel) are up.
-  const planeBasis = new THREE.Quaternion().setFromRotationMatrix(
-    new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0)),
-  )
-  const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), PLANE_TILT)
+  const planeCentre = geometry.boundingBox!.getCenter(new THREE.Vector3())
+  sheet.position.copy(planeCentre).negate()
+  const flyerOffset = planeCentre.clone().sub(new THREE.Vector3(SHEET_W / 2, SHEET_H / 2, 0)) // keeps the sheet centred
+  const from = new THREE.Vector3()
+  const to = new THREE.Vector3()
+  const turn = new THREE.Quaternion()
+  const xAxis = new THREE.Vector3(1, 0, 0)
   const zAxis = new THREE.Vector3(0, 0, 1)
-  const flyerPose = new THREE.Quaternion()
-  const gamePose = new THREE.Quaternion()
 
   // Obstacles. Placeholder boxes until the objects from the concert program are decided.
   const obstacleGeometry = new THREE.BoxGeometry(OBSTACLE_W, WORLD_H, OBSTACLE_W)
@@ -115,7 +118,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   let worldW = WORLD_H
   let flyerScale = 1
   let game = createGame(worldW)
-  let u = 0 // 0 = flat flyer, paper.steps = folded, paper.steps + 1 = plane in game position
+  let t = 0 // seconds into fold + flight: 0 = flat flyer, FOLD_SECONDS + FLIGHT_SECONDS = plane at start position
   let shownFold = -1
   let acc = 0
   let last = performance.now()
@@ -166,17 +169,17 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
 
   // Actions
-  function fold(): void {
-    unlockAudio()
-    play('fold')
-    setState('folding')
-  }
-
-  function toReady(): void {
+  function newGame(): void {
     game = createGame(worldW)
     acc = 0
     scoreText.textContent = '0'
-    setState('ready')
+  }
+
+  function fold(): void {
+    unlockAudio()
+    play('fold')
+    newGame() // before the flight, so the plane flies to where the new game starts
+    setState('folding')
   }
 
   function tap(): void {
@@ -186,7 +189,9 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
 
   function retry(): void {
-    if (performance.now() - diedAt > RETRY_DELAY) toReady()
+    if (performance.now() - diedAt < RETRY_DELAY) return
+    newGame()
+    setState('ready')
   }
 
   function gameOver(): void {
@@ -251,12 +256,14 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     const dt = Math.min((now - last) / 1000, 0.1)
     last = now
     if (state === 'folding' || state === 'unfolding') {
-      const seconds = (u < paper.steps ? STEP_SECONDS : FLIGHT_SECONDS) / (reducedMotion ? 50 : 1)
-      u = Math.min(Math.max(u + (state === 'folding' ? dt : -dt) / seconds, 0), paper.steps + 1)
-      if (u === paper.steps + 1) toReady()
-      else if (u === 0) setState('flyer')
+      const end = FOLD_SECONDS + FLIGHT_SECONDS
+      const speed = reducedMotion ? 50 : 1
+      t = Math.min(Math.max(t + (state === 'folding' ? dt : -dt) * speed, 0), end)
+      if (state === 'folding') game.y = bob(now)
+      if (t === end) setState('ready')
+      else if (t === 0) setState('flyer')
     } else if (state === 'ready') {
-      game.y = Math.sin(now / 400) * 0.15
+      game.y = bob(now)
     } else if (state === 'play' || state === 'over') {
       for (acc += dt; acc >= DT; acc -= DT) {
         const { scored, hit } = step(game)
@@ -274,23 +281,28 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
 
   function draw(): void {
-    const folded = Math.min(u, paper.steps)
+    const folded = Math.min(t / FOLD_SECONDS, 1)
     if (folded !== shownFold) {
       shownFold = folded
-      const k = Math.floor(folded)
-      paper.foldAt(k + smooth(folded - k))
+      paper.foldAt(folded)
       positions.needsUpdate = true
       geometry.computeVertexNormals()
     }
 
-    const f = smooth(Math.max(u - paper.steps, 0))
+    // Flight: from the centred flyer to the game position in a small arc, shrinking, turning nose-right
+    // and rolling the wings up. At f = 0 this is exactly the flyer pose, at f = 1 exactly the game pose.
+    const f = smooth(clamp01((t - FOLD_SECONDS) / FLIGHT_SECONDS))
+    from.copy(flyerOffset).multiplyScalar(flyerScale)
+    plane.position.lerpVectors(from, to.set(game.planeX, game.y, 0), f)
+    plane.position.y += Math.sin(Math.PI * f) * FLIGHT_ARC
     plane.scale.setScalar(THREE.MathUtils.lerp(flyerScale, PLANE_SCALE, f))
-    plane.position.set(game.planeX * f, game.y * f, 0)
-    sheet.position.lerpVectors(flyerPivot, planePivot, f).negate()
-    gamePose.setFromAxisAngle(zAxis, pitch(game)).multiply(tilt).multiply(planeBasis)
-    plane.quaternion.slerpQuaternions(flyerPose, gamePose, f)
+    plane.quaternion
+      .setFromAxisAngle(zAxis, pitch(game) * f)
+      .multiply(turn.setFromAxisAngle(xAxis, (Math.PI / 2 + PLANE_TILT) * f))
+      .multiply(turn.setFromAxisAngle(zAxis, (-Math.PI / 2) * f))
+      .multiply(turn.setFromAxisAngle(xAxis, -LEAN * Math.sin(Math.PI * folded)))
 
-    const showObstacles = state === 'ready' || state === 'play' || state === 'over'
+    const showObstacles = t > FOLD_SECONDS
     game.obstacles.forEach((o, i) => (obstacles[i] ??= createObstacle()).position.set(o.x, o.gapY, 0))
     obstacles.forEach((group, i) => (group.visible = showObstacles && i < game.obstacles.length))
 

@@ -42,8 +42,9 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.5
 // Fold
 {
   const paper = createPaper()
-  const bounds = (u: number) => {
-    paper.foldAt(u)
+  const bounds = (u: number | number[]) => {
+    if (typeof u === 'number') paper.foldAt(u)
+    else paper.pose(u)
     const axis = (offset: number) => {
       const values = paper.positions.filter((_, i) => i % 3 === offset)
       return [Math.min(...values), Math.max(...values)]
@@ -62,11 +63,16 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.5
   const sheet = bounds(0)
   assert(near(sheet.x[0], 0) && near(sheet.x[1], SHEET_W) && near(sheet.y[1], SHEET_H) && sheet.z[1] === 0, 'starts flat')
 
-  const folded = bounds(5)
+  const firstFive = Array.from({ length: paper.steps }, (_, j) => (j < 5 ? 1 : 0))
+  const folded = bounds(firstFive)
   assert(near(folded.x[0], 0) && near(folded.x[1], SHEET_W) && near(folded.y[0], 0), 'flat folds keep the base')
   assert(near(folded.y[1], 192), 'nose ends at the diagonal crossing (y = 192)')
+  assert(folded.z[1] - folded.z[0] < 1.5, 'stacked layers stay tight, so the pieces look joined')
 
-  const plane = bounds(paper.steps)
+  bounds(0.5)
+  assert([...paper.positions].every(Number.isFinite), 'mid-fold positions are finite')
+
+  const plane = bounds(1)
   assert(near(plane.x[0] + plane.x[1], SHEET_W), 'plane is symmetric')
   assert(plane.x[1] - plane.x[0] > 100 && plane.z[1] - plane.z[0] < 60, 'wings are spread out')
   assert([...paper.positions].every(Number.isFinite), 'plane positions are finite')
