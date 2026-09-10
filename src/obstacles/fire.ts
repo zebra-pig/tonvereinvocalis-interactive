@@ -40,10 +40,13 @@ const fireMaterial = (() => {
 
   // Shape: full width low down, narrowing over FLAME_H to the tip; noise licks tongues above and below it.
   const halfWidth = mix(float(0.16), float(FLAME_W / 2), soft(0, FLAME_H, below))
-  const body = clamp(float(1).sub(abs(x.add(turbulence.mul(0.12))).div(halfWidth)), 0, 1)
+  // The flame fills almost the whole hitbox width (so what you see is what you hit), hottest in the middle.
+  const across = abs(x.add(turbulence.mul(0.1))).div(halfWidth) // 0 in the middle, 1 at the hitbox edge
+  const body = float(1).sub(soft(0.6, 1.05, across))
   const tongues = soft(-0.15, 0.45, below.add(TIP).add(turbulence.mul(0.45)))
   const flicker = sin(time.mul(11).add(seed.mul(7))).mul(0.04).add(1)
-  const heat = pow(clamp(body.mul(tongues).mul(turbulence.mul(0.35).add(0.85)).mul(flicker), 0, 1), float(1.4))
+  const hotCore = float(0.6).add(clamp(float(1).sub(across), 0, 1).mul(0.5))
+  const heat = pow(clamp(body.mul(tongues).mul(hotCore).mul(turbulence.mul(0.3).add(0.9)).mul(flicker), 0, 1), float(1.1))
 
   // Blackbody-like ramp: deep red embers → orange → yellow → white-hot core.
   const ramp = mix(
@@ -51,7 +54,7 @@ const fireMaterial = (() => {
     color(0xfff3d6),
     soft(0.65, 0.95, heat),
   )
-  const coverage = soft(0.02, 0.45, heat)
+  const coverage = soft(0.02, 0.3, heat)
 
   const material = new THREE.MeshBasicNodeMaterial(glow)
   material.colorNode = ramp.mul(heat.mul(1.6).add(coverage.mul(0.4)))

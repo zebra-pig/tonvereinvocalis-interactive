@@ -200,7 +200,7 @@ const ring = (radius: number, y: number) =>
   Array.from({ length: 32 }, (_, k) => [Math.sin((k / 32) * Math.PI * 2) * radius, y, Math.cos((k / 32) * Math.PI * 2) * radius]).flat()
 const DRUM_HULL = Array.from(drumGeometry.getAttribute('position').array)
 // Hanging drums also carry the sling of the drum below.
-const HANG_HULL = [...DRUM_HULL, ...ring(STRAND_R + 0.015, -H / 2 - 0.03), ...ring(STRAND_R + 0.015, -H / 2 + HOOP_H + STRAP_W)]
+const HANG_HULL = [...DRUM_HULL, ...ring(STRAND_R + 0.055, -H / 2 - 0.03), ...ring(STRAND_R + 0.055, -H / 2 + HOOP_H + STRAP_W)]
 
 const box = new THREE.Box3()
 const point = new THREE.Vector3()
@@ -310,19 +310,21 @@ function sling(drum: THREE.Matrix4, below: THREE.Matrix4, colors: string[], rand
   const rise = 0.06 + random() * 0.2 // tilted like a girth hitch: lowest where the strands leave
   const loop: THREE.Vector3[] = []
   const loopNormals: THREE.Vector3[] = []
-  for (let j = 0; j < 20; j++) {
-    const a = exit + (j / 20) * Math.PI * 2
+  for (let j = 0; j < 16; j++) {
+    const a = exit + (j / 16) * Math.PI * 2
     const radial = new THREE.Vector3(Math.sin(a), 0, Math.cos(a))
     loop.push(radial.clone().multiplyScalar(LOOP_R).setY(low + (rise * (1 - Math.cos(a - exit))) / 2).applyMatrix4(drum))
     loopNormals.push(radial.transformDirection(drum))
   }
   const parts = [...end.parts, band(loop, loopNormals, colors, true)]
   for (const side of [-1, 1]) {
-    const a = exit + (side * STRAP_W * 0.52) / LOOP_R
+    const a = exit + (side * STRAP_W * 1.1) / LOOP_R // a V of two strands, meeting at the clip
     const radial = new THREE.Vector3(Math.sin(a), 0, Math.cos(a))
-    const at = (r: number, y: number) => radial.clone().multiplyScalar(r).setY(y).applyMatrix4(drum)
-    const path = resample([at(STRAND_R, low + STRAP_W * 0.3), at(STRAND_R, -H / 2 + 0.02), at(STRAND_R - 0.015, -H / 2 - 0.03), end.top], 0.14)
+    const r = STRAND_R + (side + 1) * STRAP_T * 0.4 // one strand lies on the other where they meet
+    const at = (radius: number, y: number) => radial.clone().multiplyScalar(radius).setY(y).applyMatrix4(drum)
     const normal = radial.transformDirection(drum)
+    const meet = end.top.clone().addScaledVector(end.radial, (side + 1) * STRAP_T * 0.6)
+    const path = resample([at(r, low + STRAP_W * 0.3), at(r, -H / 2 + 0.02), at(r - 0.015, -H / 2 - 0.03), meet], 0.18)
     parts.push(band(path, path.map(() => normal), colors))
   }
   return parts
@@ -339,16 +341,25 @@ export function hangingDrums(gapTop: number, random: () => number, disposables: 
   for (;;) {
     const radius = 0.9 + random() * 0.1
     const height = 0.9 + random() * 0.14
-    const toward = (random() * 2 - 1) * 1.05 + (random() < 0.2 ? Math.PI : 0) // eyelet mostly towards the camera
+    const toward = (random() * 2 - 1) * 0.9 + (random() < 0.2 ? Math.PI : 0) // eyelet mostly towards the camera
     const tilt = 0.12 + random() * 0.22 // hangs from one point, so it tips a little
     const { rotation, bounds } = fit((spread) => upright(toward, toward, tilt * spread, radius, height), HANG_HULL)
     const below = matrices.at(-1)
+    let x = within(bounds, random, 0.4)
     let y = (below ? top + 0.12 + random() * 0.4 : gapTop) - bounds.min.y
-    const drum = new THREE.Matrix4().makeTranslation(within(bounds, random, 0.4), 0, 0).multiply(rotation)
-    const place = () => drum.setPosition(drum.elements[12], y, 0)
+    const drum = new THREE.Matrix4().multiply(rotation)
+    const place = () => drum.setPosition(x, y, 0)
     place()
     if (below) {
       const hook = clip(below, true).top
+      for (let k = 0; k < 3; k++) {
+        // Shift sideways so the strands hang plumb above the hook, as far as the hitbox allows.
+        const local = hook.clone().applyMatrix4(drum.clone().invert())
+        const a = Math.atan2(local.x, local.z)
+        const exit = new THREE.Vector3(Math.sin(a) * STRAND_R, -H / 2, Math.cos(a) * STRAND_R).applyMatrix4(drum)
+        x = THREE.MathUtils.clamp(x + (hook.x - exit.x) * 0.8, -LIMIT - bounds.min.x, LIMIT - bounds.max.x)
+        place()
+      }
       for (let k = 0; k < 3; k++) {
         const lack = hook.clone().applyMatrix4(drum.clone().invert()).y + H / 2 + 0.14 // hook must hang clearly below
         if (lack <= 0) break
@@ -366,7 +377,8 @@ export function hangingDrums(gapTop: number, random: () => number, disposables: 
   const end = clip(matrices.at(-1)!, true)
   parts.push(...end.parts)
   for (const side of [-1, 1]) {
-    const path = resample([end.top, end.top.clone().addScaledVector(end.tangent, side * 0.03).setY(FAR + 1)], 0.3)
+    const start = end.top.clone().addScaledVector(end.radial, (side + 1) * STRAP_T * 0.6)
+    const path = resample([start, start.clone().addScaledVector(end.tangent, side * 0.035).setY(FAR + 1)], 0.4)
     parts.push(band(path, path.map(() => end.radial), straps))
   }
   group.add(drums(matrices, styles, disposables), extras(parts, disposables))

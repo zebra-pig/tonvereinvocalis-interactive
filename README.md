@@ -78,7 +78,7 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
   - Plane pitch follows vertical speed.
   - Collision: circle vs. obstacle boxes. Score goes up once per passed obstacle.
 - **Obstacles:** stylized low-poly models built in code (`src/obstacles.ts`), no model files. Hitboxes in `game.ts` use the same numbers, and `obstacles.test.ts` checks that every model stays inside its hitbox.
-  - **Top:** Basler Trommeln hanging on straps; stage lights on a truss drop (PAR cans and a moving head; soft beams are decorative, not part of the hitbox); or game controllers from different eras dangling from their cables.
+  - **Top:** Basler Trommeln hanging on straps; stage lights on a truss drop (PAR cans and a moving head that pans and tilts; soft beams are decorative, not part of the hitbox); or game controllers from different eras dangling from their cables.
   - **Bottom:** stacked Trommeln; the Matterhorn (triangular hitbox along its slopes); a plain fire column with a photorealistic TSL shader (domain-warped fractal noise, blackbody colour ramp, glow blending that stays luminous on a light page) and rising embers; a pile of phones from brick phone to smartphone; or stacked car tyres.
   - **Wind:** autumn leaves blow up through an updraft that lifts the plane. It only appears where nothing rises from below: as a free column (being blown off the top ends the flight) or under a hanging part.
   - They slide in with the plane's flight into position: top parts from above, bottom parts from below, left to right as a wave. They slide back out when unfolding, and new ones slide in after a retry.
