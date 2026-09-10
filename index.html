@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Vorschau – Tonverein Vocalis Flyer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Be+Vietnam+Pro:ital,wght@0,400;0,700;1,400&display=swap"
+    />
+    <style>
+      /* Mimics a tonvereinvocalis.ch/konzerte/* page. Everything here except <vocalis-flyer> lives in Webstudio. */
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 1rem/1.45 "Be Vietnam Pro", sans-serif;
+        color: #000;
+        background: linear-gradient(135deg, #c5e8fb, #e6e6e6);
+      }
+      h2 { font: 1.9rem/1 "Bebas Neue", sans-serif; margin: 0 0 0.5rem; }
+      .wrap { width: min(100% - 2.5rem, 54rem); margin-inline: auto; }
+      header {
+        position: absolute; inset: 0 0 auto; z-index: 1; pointer-events: none;
+        display: flex; justify-content: space-between; align-items: center; padding-block: 1.75rem;
+      }
+      .logo { font: 2.4rem/0.9 "Bebas Neue", sans-serif; transform: rotate(-4deg); }
+      .menu { width: 4.5rem; height: 3.5rem; background: repeating-linear-gradient(-3deg, #000 0 6px, transparent 6px 22px); }
+      vocalis-flyer { width: 100%; height: 100svh; }
+      section { padding-block: 2.5rem; }
+      .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 3rem; }
+      .facts ul { list-style: none; margin: 0; padding: 0; border-top: 2px solid; }
+      .facts li { padding-block: 0.6rem; border-bottom: 2px solid; }
+      footer { display: flex; justify-content: space-between; padding-block: 4rem 2rem; }
+    </style>
+  </head>
+  <body>
+    <header class="wrap">
+      <div class="logo">Tonverein<br />Vocalis</div>
+      <div class="menu" aria-hidden="true"></div>
+    </header>
+
+    <vocalis-flyer></vocalis-flyer>
+
+    <main class="wrap">
+      <section>
+        <p>
+          Platzhalter für die Konzertbeschreibung. Dieser Text wird in Webstudio gepflegt und ist nicht Teil
+          der Komponente.
+        </p>
+      </section>
+      <section>
+        <h2>Über den Chor</h2>
+        <p>
+          Der Tonverein Vocalis ist ein Chor für junge Erwachsene. Sein Schwerpunkt liegt auf A-cappella-Musik,
+          ergänzt durch gelegentliche instrumentale Begleitung.
+        </p>
+      </section>
+      <section class="facts">
+        <div>
+          <h2>Konzerte</h2>
+          <ul>
+            <li>Samstag, 1. Januar 2027, 19:00</li>
+            <li>Sonntag, 2. Januar 2027, 17:00</li>
+            <li>Eintritt frei, Kollekte</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Adresse</h2>
+          <ul>
+            <li>Ort</li>
+            <li>Strasse, PLZ Basel</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <span>© Tonverein Vocalis</span>
+      <span>Impressum</span>
+    </footer>
+
+    <script type="module" src="/src/vocalis-flyer.ts"></script>
+  </body>
+</html>

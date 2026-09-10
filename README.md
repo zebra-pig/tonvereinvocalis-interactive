@@ -31,7 +31,7 @@ Obstacles are objects related to the concert program (TBD).
 | Artwork | Our own. No original Flappy Bird sprites. | The reference repo has no license, and its sprites are copyrighted |
 | High score | `localStorage` (wrapped in try/catch) | Keeps the Worker assets-only |
 | Language | German in-game text | Matches the site |
-| Language | TypeScript, `strict: true` | Vite only strips types and never type-checks, so `npm run build` runs `tsc --noEmit` first. A type error fails the build, and with it the Cloudflare deploy. |
+| Language | TypeScript, `strict: true` | Vite only strips types and never type-checks, so `pnpm run build` runs `tsc --noEmit` first. A type error fails the build, and with it the Cloudflare deploy. |
 | Dev / build | Vite | Dev server + multi-entry build |
 | Hosting | Cloudflare Worker, static assets only, git-connected Workers Builds | Builds run on Cloudflare |
 
@@ -110,9 +110,9 @@ Assets-only Worker, deployed from Git. Builds run on Cloudflare.
 
 | Setting | Value |
 |---|---|
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` |
-| Non-production branch deploy command | `npx wrangler versions upload` (gives a preview URL per branch) |
+| Build command | `pnpm run build` |
+| Deploy command | `pnpm exec wrangler deploy` |
+| Non-production branch deploy command | `pnpm exec wrangler versions upload` (gives a preview URL per branch) |
 | Root directory | `/` |
 | Node | 24 (Workers Builds default, pinned via `.node-version`) |
 
@@ -145,15 +145,15 @@ Add an **HTML Embed**, check **Client Only**, and paste:
 ## Development (planned)
 
 ```sh
-npm install
-npm run dev          # Vite dev server with the preview site (types stripped, not checked)
-npm run typecheck    # tsc --noEmit (add --watch while developing)
-npm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer.js, assets/, _headers
-npm run preview      # build + wrangler dev (serves dist with _headers like production)
+pnpm install
+pnpm run dev          # Vite dev server with the preview site (types stripped, not checked)
+pnpm run typecheck    # tsc --noEmit (add --watch while developing)
+pnpm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer.js, assets/, _headers
+pnpm run preview      # build + wrangler dev (serves dist with _headers like production)
 node src/game.check.ts
 ```
 
-Type errors never reach production: Workers Builds runs `npm run build`, which stops at `tsc`.
+Type errors never reach production: Workers Builds runs `pnpm run build`, which stops at `tsc`.
 
 **Manual checks:**
 - Fold, fly, crash, retry and unfold.
