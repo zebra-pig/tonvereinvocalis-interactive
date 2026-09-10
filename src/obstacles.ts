@@ -2,19 +2,13 @@
 import * as THREE from 'three/webgpu'
 import { clamp, color, float, fwidth, min, mix, modelPosition, mx_noise_float, positionLocal, smoothstep, time, vec3 } from 'three/tsl'
 import type { Node } from 'three/webgpu'
-import {
-  DRUM_H,
-  DRUM_R,
-  FLAME_H,
-  FLAME_W,
-  GAP,
-  LOGS_W,
-  MOUNTAIN_BASE,
-  mountainScale,
-  type Obstacle,
-  WIND_W,
-  WORLD_H,
-} from './game.ts'
+import { controllers } from './controllers.ts'
+import { drumStack, hangingDrums } from './drums.ts'
+import { stageLights } from './lights.ts'
+import { phonePile } from './phones.ts'
+import { tireStack } from './tires.ts'
+import { FLAME_H, FLAME_W, GAP, LOGS_W, MOUNTAIN_BASE, mountainScale, type Obstacle, WIND_W, WORLD_H } from './game.ts'
+import { type Disposable, FAR, hash, merge, type Paint, paint, pose, seeded, subdivide, triangles, type V3 } from './geometry.ts'
 
 export type ObstacleView = {
   group: THREE.Group
@@ -23,15 +17,6 @@ export type ObstacleView = {
   update(seconds: number): void
   dispose(): void
 }
-
-const STRAP = 0.28 // strap between hanging drums
-const FAR = WORLD_H / 2 + 0.6 // columns reach a bit past the screen edge
-
-type V3 = [number, number, number]
-type Paint = (triangle: number, centroid: V3) => THREE.ColorRepresentation
-
-// Shared material: flat-shaded vertex colours for everything but fire and leaves.
-const paint = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.65, side: THREE.DoubleSide })
 
 export function createObstacleView(o: Obstacle): ObstacleView {
   const random = seeded(o.seed)
@@ -43,21 +28,29 @@ export function createObstacleView(o: Obstacle): ObstacleView {
   bottom.name = 'bottom'
   wind.name = 'wind'
   group.add(top, bottom, wind)
-  const disposables: { dispose(): void }[] = []
+  const disposables: Disposable[] = []
   const gapTop = o.gapY + GAP / 2
   const gapBottom = o.gapY - GAP / 2
 
+  const updates: ((seconds: number) => void)[] = []
   if (o.top === 'drums') top.add(hangingDrums(gapTop, random, disposables))
+  if (o.top === 'lights') top.add(stageLights(gapTop, random, disposables))
+  if (o.top === 'controllers') {
+    const dangling = controllers(gapTop, random, disposables)
+    top.add(dangling.group)
+    updates.push(dangling.update)
+  }
   if (o.bottom === 'drums') bottom.add(drumStack(gapBottom, random, disposables))
   if (o.bottom === 'matterhorn') bottom.add(matterhorn(o, gapBottom))
   if (o.bottom === 'fire') bottom.add(fire(gapBottom, random, disposables))
+  if (o.bottom === 'phones') bottom.add(phonePile(gapBottom, random, disposables))
+  if (o.bottom === 'tires') bottom.add(tireStack(gapBottom, random, disposables))
 
-  let leaves: ((seconds: number) => void) | undefined
   if (o.wind) {
     const zone = leafZone(-FAR, o.top ? gapTop : FAR, random) // wind columns never have a bottom part
     wind.add(zone.mesh)
     disposables.push(zone.mesh)
-    leaves = zone.update
+    updates.push(zone.update)
   }
 
   return {
@@ -69,93 +62,12 @@ export function createObstacleView(o: Obstacle): ObstacleView {
       group.visible = k > 0
     },
     update(seconds) {
-      leaves?.(seconds)
+      for (const update of updates) update(seconds)
     },
     dispose() {
       for (const item of disposables) item.dispose()
     },
   }
-}
-
-// Basler Trommel: squat chrome shell, black-and-white striped hoops, zig-zag cords with leather tensioners.
-const drumGeometry = (() => {
-  const r = DRUM_R
-  const h = DRUM_H
-  const parts: [THREE.BufferGeometry, Paint][] = []
-  const shell = new THREE.CylinderGeometry(r * 0.96, r * 0.96, h * 0.74, 18, 1, true)
-  parts.push([shell, (t) => (Math.floor(t / 2) % 2 ? '#dfe3e7' : '#b3b9bf')])
-  parts.push([new THREE.CircleGeometry(r * 0.96, 18).rotateX(-Math.PI / 2).translate(0, h * 0.36, 0), () => '#efe7d4'])
-
-  const segments = 24
-  for (const y of [h * 0.43, -h * 0.43]) {
-    const hoop = new THREE.CylinderGeometry(r, r, h * 0.14, segments, 1, true).toNonIndexed()
-    const p = hoop.getAttribute('position')
-    const a = (Math.PI * 2) / segments // shift the top ring by one segment: diagonal stripes
-    for (let i = 0; i < p.count; i++) {
-      if (p.getY(i) <= 0) continue
-      const x = p.getX(i)
-      const z = p.getZ(i)
-      p.setXYZ(i, x * Math.cos(a) - z * Math.sin(a), p.getY(i), x * Math.sin(a) + z * Math.cos(a))
-    }
-    parts.push([hoop.translate(0, y, 0), (t) => (Math.floor(t / 2) % 2 ? '#151515' : '#f5f5f2')])
-  }
-
-  const points = Array.from({ length: 20 }, (_, k) => {
-    const angle = (k / 20) * Math.PI * 2
-    return new THREE.Vector3(Math.cos(angle) * r * 1.01, k % 2 ? -h * 0.34 : h * 0.34, Math.sin(angle) * r * 1.01)
-  })
-  const cords = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points, true, 'catmullrom', 0), 160, 0.013, 3, true)
-  parts.push([cords, () => '#ede6d3'])
-  points.forEach((point, k) => {
-    const next = points[(k + 1) % points.length]
-    const from = point.y > 0 ? point : next
-    const to = point.y > 0 ? next : point
-    const at = from.clone().lerp(to, 0.3).multiplyScalar(1.02)
-    const tensioner = new THREE.BoxGeometry(0.045, 0.08, 0.035).rotateY(-Math.atan2(at.z, at.x)).translate(at.x, at.y, at.z)
-    parts.push([tensioner, () => '#2a211b'])
-  })
-  return merge(parts)
-})()
-
-const sticksGeometry = merge(
-  [0.45, -0.45].map((yaw) => [
-    new THREE.CylinderGeometry(0.016, 0.022, 0.72, 6).rotateZ(Math.PI / 2).rotateY(yaw).translate(0, DRUM_H * 0.36 + 0.03, 0),
-    () => '#d9c29a',
-  ]),
-)
-const strapGeometry = new THREE.BoxGeometry(0.08, 1, 0.025)
-const leather = new THREE.MeshStandardMaterial({ color: '#3a2a1f', roughness: 0.8 })
-
-function hangingDrums(gapTop: number, random: () => number, disposables: { dispose(): void }[]): THREE.Group {
-  const group = new THREE.Group()
-  const count = Math.max(1, Math.ceil((FAR - gapTop) / (DRUM_H + STRAP)))
-  const drums = new THREE.InstancedMesh(drumGeometry, paint, count)
-  for (let i = 0; i < count; i++) {
-    const y = gapTop + DRUM_H / 2 + i * (DRUM_H + STRAP)
-    drums.setMatrixAt(i, pose(0, y, random() * Math.PI * 2, (random() - 0.5) * 0.1))
-  }
-  // One strap through the whole column: hidden inside the drums, visible between them.
-  const strap = new THREE.Mesh(strapGeometry, leather)
-  strap.scale.y = FAR + 1 - gapTop
-  strap.position.y = gapTop + strap.scale.y / 2
-  group.add(drums, strap)
-  disposables.push(drums)
-  return group
-}
-
-function drumStack(gapBottom: number, random: () => number, disposables: { dispose(): void }[]): THREE.Group {
-  const group = new THREE.Group()
-  const count = Math.max(1, Math.ceil((gapBottom + FAR) / DRUM_H))
-  const drums = new THREE.InstancedMesh(drumGeometry, paint, count)
-  for (let i = 0; i < count; i++) {
-    drums.setMatrixAt(i, pose((random() - 0.5) * 0.04, gapBottom - DRUM_H / 2 - i * DRUM_H, random() * Math.PI * 2, 0))
-  }
-  const sticks = new THREE.Mesh(sticksGeometry, paint)
-  sticks.position.y = gapBottom - DRUM_H / 2
-  sticks.rotation.y = random() * Math.PI
-  group.add(drums, sticks)
-  disposables.push(drums)
-  return group
 }
 
 // Matterhorn from Zermatt: hooked summit left of centre, steep Furggen ridge on the left, Hörnli ridge towards
@@ -220,7 +132,7 @@ const logGeometry = new THREE.CylinderGeometry(0.11, 0.11, LOGS_W, 7).rotateZ(Ma
 const wood = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 0.9 })
 const WOOD = ['#6b4226', '#7a4a2a', '#8b5a2b', '#5a3a22']
 
-function fire(gapBottom: number, random: () => number, disposables: { dispose(): void }[]): THREE.Group {
+function fire(gapBottom: number, random: () => number, disposables: Disposable[]): THREE.Group {
   const group = new THREE.Group()
   const flameBase = gapBottom - FLAME_H
   const layers = Math.max(1, Math.ceil((flameBase + FAR) / 0.2))
@@ -292,70 +204,4 @@ function leafZone(bottomY: number, topY: number, random: () => number) {
   }
   update(0)
   return { mesh, update }
-}
-
-// Helpers
-
-const euler = new THREE.Euler()
-const quaternion = new THREE.Quaternion()
-const one = new THREE.Vector3(1, 1, 1)
-function pose(x: number, y: number, yaw: number, tilt: number, z = 0): THREE.Matrix4 {
-  return new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), quaternion.setFromEuler(euler.set(0, yaw, tilt)), one)
-}
-
-/** Merges geometries into one non-indexed geometry with per-triangle vertex colours. */
-function merge(parts: [THREE.BufferGeometry, Paint][]): THREE.BufferGeometry {
-  const positions: number[] = []
-  const colors: number[] = []
-  const tint = new THREE.Color()
-  for (const [geometry, paintTriangle] of parts) {
-    const p = (geometry.index ? geometry.toNonIndexed() : geometry).getAttribute('position')
-    for (let t = 0; t < p.count / 3; t++) {
-      const corners = [0, 1, 2].map((c) => [p.getX(t * 3 + c), p.getY(t * 3 + c), p.getZ(t * 3 + c)])
-      const centroid = [0, 1, 2].map((axis) => (corners[0][axis] + corners[1][axis] + corners[2][axis]) / 3) as V3
-      tint.set(paintTriangle(t, centroid))
-      for (const corner of corners) {
-        positions.push(...corner)
-        colors.push(tint.r, tint.g, tint.b)
-      }
-    }
-  }
-  const merged = new THREE.BufferGeometry()
-  merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  merged.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-  merged.computeVertexNormals()
-  return merged
-}
-
-function triangles(list: V3[][]): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry()
-  g.setAttribute('position', new THREE.Float32BufferAttribute(list.flat(2), 3))
-  return g
-}
-
-// Splits every triangle into four; new vertices get a little depth jitter for rocky facets. The jitter depends
-// only on the position, so neighbouring triangles stay connected.
-function subdivide(list: V3[][], levels: number): V3[][] {
-  if (levels === 0) return list
-  const mid = (a: V3, b: V3): V3 => {
-    const m: V3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]
-    return [m[0] + (hash(...m) - 0.5) * 0.012, m[1], m[2] + (hash(m[1], m[0], m[2]) - 0.5) * 0.06]
-  }
-  const next = list.flatMap(([a, b, c]) => {
-    const ab = mid(a, b)
-    const bc = mid(b, c)
-    const ca = mid(c, a)
-    return [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]
-  })
-  return subdivide(next, levels - 1)
-}
-
-function hash(x: number, y: number, z: number): number {
-  const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453
-  return s - Math.floor(s)
-}
-
-function seeded(seed: number): () => number {
-  let state = Math.floor(seed * 2147483646) + 1
-  return () => (state = (state * 16807) % 2147483647) / 2147483647
 }

@@ -52,7 +52,9 @@ src/vocalis-flyer-interaktiv.ts  Custom Element: shadow DOM, <img> poster, overl
 src/scene.ts          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
 src/fold.ts           origami data + foldAt(t)
 src/game.ts           pure game logic (no Three.js): physics, spawning, collision, scoring
-src/obstacles.ts      low-poly obstacle models (drums, Matterhorn, fire shader, wind leaves)
+src/obstacles.ts      obstacle views: Matterhorn, fire shader, wind leaves; wires in the models below
+src/drums.ts, lights.ts, controllers.ts, phones.ts, tires.ts   low-poly models per obstacle kind
+src/geometry.ts       shared model helpers (vertex-colour merge, seeded random)
 src/*.test.ts         Vitest tests for game logic and fold (`pnpm test`)
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 ```
@@ -75,10 +77,9 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
   - Plane pitch follows vertical speed.
   - Collision: circle vs. obstacle boxes. Score goes up once per passed obstacle.
 - **Obstacles:** stylized low-poly models built in code (`src/obstacles.ts`), no model files. Hitboxes in `game.ts` use the same numbers, and `obstacles.test.ts` checks that every model stays inside its hitbox.
-  - **Top:** Basler Trommeln hanging on a strap.
-  - **Bottom:** stacked Trommeln, the Matterhorn (triangular hitbox along its slopes), or a log fire with an animated TSL flame shader (noise cut-out, no blending).
+  - **Top:** Basler Trommeln hanging on straps; stage lights on a truss drop (PAR cans and a moving head; soft beams are decorative, not part of the hitbox); or game controllers from different eras dangling from their cables.
+  - **Bottom:** stacked Trommeln; the Matterhorn (triangular hitbox along its slopes); a log fire with an animated TSL flame shader (noise cut-out, no blending); a pile of phones from brick phone to smartphone; or stacked car tyres.
   - **Wind:** autumn leaves blow up through an updraft that lifts the plane. It only appears where nothing rises from below: as a free column (being blown off the top ends the flight) or under a hanging part.
-  - **Planned:** stage lights and game controllers hanging from the top; piles of phones and car tyres at the bottom.
   - They slide in with the plane's flight into position: top parts from above, bottom parts from below, left to right as a wave. They slide back out when unfolding, and new ones slide in after a retry.
 - **Overlay UI** (HTML in shadow DOM):
   - "Tippen zum Falten" hint

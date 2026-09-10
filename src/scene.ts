@@ -104,8 +104,9 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   // Obstacles: one view per obstacle, created when it spawns and disposed when it's gone.
   const views = new Map<Obstacle, ObstacleView>()
   // Compile every obstacle's shaders up front, so the first fire doesn't stutter mid-flight.
-  const samples = (['drums', 'matterhorn', 'fire'] as const).map((bottom, i): Obstacle => {
-    return { x: (i - 1) * 3, gapY: 0, top: 'drums', bottom, wind: true, seed: 0.5, passed: false }
+  const tops = ['drums', 'lights', 'controllers'] as const
+  const samples = (['drums', 'matterhorn', 'fire', 'phones', 'tires'] as const).map((bottom, i): Obstacle => {
+    return { x: 0, gapY: 0, top: tops[i % tops.length], bottom, wind: i === 0, seed: 0.5, passed: false }
   })
   const warmups = samples.map((sample) => {
     const view = createObstacleView(sample)

@@ -35,9 +35,8 @@ const MAX_RISE = 5.5 // updrafts can't accelerate the plane beyond this
 export type Top = 'drums' | 'lights' | 'controllers'
 export type Bottom = 'drums' | 'matterhorn' | 'fire' | 'phones' | 'tires'
 
-// Kinds that have models so far; the rest join once theirs exist.
-const TOPS: Top[] = ['drums']
-const BOTTOMS: Bottom[] = ['drums', 'matterhorn', 'fire']
+const TOPS: Top[] = ['drums', 'lights', 'controllers']
+const BOTTOMS: Bottom[] = ['drums', 'matterhorn', 'fire', 'phones', 'tires']
 const HALF_WIDTH = { drums: DRUM_R, lights: LIGHTS_R, controllers: CONTROLLERS_R, phones: PHONES_R, tires: TIRE_R }
 
 export type Obstacle = {
