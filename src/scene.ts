@@ -13,6 +13,8 @@ const backUrl = Object.values(
 const FOLD_SECONDS = 1.5
 const FLIGHT_SECONDS = 0.8 // folded sheet → plane at its start position
 const FLIGHT_ARC = 0.6 // world units the plane rises mid-flight
+const ENTER_SECONDS = 0.6 // obstacles sliding in after a retry (otherwise they follow the flight)
+const STAGGER = 0.4 // obstacles further right arrive later, as a wave
 const LEAN = 0.35 // radians the sheet leans back while folding, so the folds read in depth
 const PLANE_SCALE = 0.005 // mm → world units, the plane ends up ~1 unit long
 const PLANE_TILT = 0.8 // roll towards the camera so the wings read from the side
@@ -106,9 +108,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     const group = new THREE.Group()
     const top = new THREE.Mesh(obstacleGeometry, obstacleMaterial)
     const bottom = new THREE.Mesh(obstacleGeometry, obstacleMaterial)
-    top.position.y = GAP / 2 + WORLD_H / 2
-    bottom.position.y = -GAP / 2 - WORLD_H / 2
-    group.add(top, bottom)
+    group.add(top, bottom) // positioned in draw()
     scene.add(group)
     return group
   }
@@ -123,6 +123,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   let acc = 0
   let last = performance.now()
   let diedAt = 0
+  let gameStartedAt = 0
   let best = Number(storage.get('best')) || 0
   let dirty = true // the static flyer only re-renders when something changed
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -171,6 +172,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   // Actions
   function newGame(): void {
     game = createGame(worldW)
+    gameStartedAt = performance.now()
     acc = 0
     scoreText.textContent = '0'
   }
@@ -277,10 +279,10 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
       return
     }
     dirty = false
-    draw()
+    draw(now)
   }
 
-  function draw(): void {
+  function draw(now: number): void {
     const folded = Math.min(t / FOLD_SECONDS, 1)
     if (folded !== shownFold) {
       shownFold = folded
@@ -302,9 +304,19 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
       .multiply(turn.setFromAxisAngle(zAxis, (-Math.PI / 2) * f))
       .multiply(turn.setFromAxisAngle(xAxis, -LEAN * Math.sin(Math.PI * folded)))
 
-    const showObstacles = t > FOLD_SECONDS
-    game.obstacles.forEach((o, i) => (obstacles[i] ??= createObstacle()).position.set(o.x, o.gapY, 0))
-    obstacles.forEach((group, i) => (group.visible = showObstacles && i < game.obstacles.length))
+    // Obstacles slide in with the flight (top ones from above, bottom ones from below) and back out when
+    // unfolding. After a retry the new ones slide in on their own timer.
+    const appear = Math.min(f, clamp01((now - gameStartedAt) / (ENTER_SECONDS * 1000)))
+    game.obstacles.forEach((o, i) => {
+      const group = (obstacles[i] ??= createObstacle())
+      const k = smooth(clamp01(appear * (1 + STAGGER) - STAGGER * clamp01(o.x / worldW + 0.5)))
+      const away = (1 - k) * WORLD_H
+      group.position.set(o.x, o.gapY, 0)
+      group.children[0].position.y = GAP / 2 + WORLD_H / 2 + away
+      group.children[1].position.y = -GAP / 2 - WORLD_H / 2 - away
+      group.visible = k > 0
+    })
+    for (let i = game.obstacles.length; i < obstacles.length; i++) obstacles[i].visible = false
 
     renderer.render(scene, camera)
     poster.hidden = true // only now, so a background tab keeps showing the flyer image until the first frame

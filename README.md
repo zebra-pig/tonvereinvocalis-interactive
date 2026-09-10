@@ -74,6 +74,7 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
   - Plane pitch follows vertical speed.
   - Collision: circle vs. obstacle boxes. Score goes up once per passed obstacle.
 - **Obstacles:** placeholder boxes behind a `createObstacle()` function, to be swapped for program-themed GLB models (`GLTFLoader`).
+  - They slide in with the plane's flight into position: top parts from above, bottom parts from below, left to right as a wave. They slide back out when unfolding, and new ones slide in after a retry.
 - **Overlay UI** (HTML in shadow DOM):
   - "Tippen zum Falten" hint
   - score at top centre (the site logo sits top-left and the menu top-right)
