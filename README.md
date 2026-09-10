@@ -2,7 +2,7 @@
 
 `<vocalis-flyer>` — an interactive concert "flyer" for [tonvereinvocalis.ch](https://tonvereinvocalis.ch): an A4 flyer that folds into a paper plane, which you then fly through a Flappy Bird–style obstacle course. Shipped as a web component, embedded in Webstudio, hosted as an assets-only Cloudflare Worker.
 
-> Status: concept / setup. No code yet.
+> Status: first playable version. Placeholder flyer and obstacles, no sounds yet.
 
 ## Concept
 
@@ -52,7 +52,7 @@ src/vocalis-flyer.ts  Custom Element: shadow DOM, <img> poster, overlay UI, lazy
 src/scene.ts          Three.js renderer, camera, paper mesh, obstacles, render loop, state machine
 src/fold.ts           origami data + foldAt(t)
 src/game.ts           pure game logic (no Three.js): physics, spawning, collision, scoring
-src/game.check.ts     `node src/game.check.ts` (Node 24 strips types natively) — assert-based self-check
+src/check.ts          `node src/check.ts` (Node 24 strips types natively) — asserts for game logic and fold
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 ```
 
@@ -100,7 +100,6 @@ src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
 - `foldAt(t)` rebuilds all face matrices from the flat sheet on every frame. For each step it maps the crease through the anchor face's accumulated matrix, then rotates the moving faces by `angle × stepProgress`. The result is deterministic, and unfolding is the same function run backwards.
 - Layers get tiny static offsets to avoid z-fighting.
 - The final fold state *is* the plane. A camera tween goes from the front view of the flyer to a side view, with no mesh swap.
-- `index.html?debug` labels face IDs to help write the fold steps.
 
 ## Deployment (Cloudflare Workers Builds)
 
@@ -150,7 +149,7 @@ pnpm run dev          # Vite dev server with the preview site (types stripped, n
 pnpm run typecheck    # tsc --noEmit (add --watch while developing)
 pnpm run build        # tsc --noEmit && vite build → dist/: index.html, vocalis-flyer.js, assets/, _headers
 pnpm run preview      # build + wrangler dev (serves dist with _headers like production)
-node src/game.check.ts
+node src/check.ts
 ```
 
 Type errors never reach production: Workers Builds runs `pnpm run build`, which stops at `tsc`.

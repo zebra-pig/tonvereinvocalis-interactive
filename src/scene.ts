@@ -1,0 +1,336 @@
+import * as THREE from 'three/webgpu'
+import { createPaper, SHEET_H, SHEET_W } from './fold.ts'
+import { createGame, DT, flap, GAP, OBSTACLE_W, pitch, resize, step, WORLD_H } from './game.ts'
+
+type State = 'flyer' | 'folding' | 'ready' | 'play' | 'over' | 'unfolding'
+
+// Named by event: fold, flap, score, hit, unfold. Missing files simply stay silent.
+const sounds = import.meta.glob<string>('./assets/sfx/*.{mp3,ogg,wav,m4a}', { eager: true, query: '?url', import: 'default' })
+const backUrl = Object.values(
+  import.meta.glob<string>('./assets/flyer-back.*', { eager: true, query: '?url', import: 'default' }),
+)[0]
+
+const STEP_SECONDS = 0.45 // per fold
+const FLIGHT_SECONDS = 1 // folded sheet → plane in game position
+const PLANE_SCALE = 0.0036 // mm → world units, the plane ends up ~0.7 units long
+const PLANE_TILT = 0.35 // roll towards the camera so the wings read from the side
+const FOV = 30
+const RETRY_DELAY = 500 // ms, so frantic tapping right after a crash doesn't restart
+
+const smooth = (t: number) => t * t * (3 - 2 * t)
+
+const storage = {
+  get(key: string): string | null {
+    try {
+      return localStorage.getItem(`vocalis-flyer:${key}`)
+    } catch {
+      return null
+    }
+  },
+  set(key: string, value: string): void {
+    try {
+      localStorage.setItem(`vocalis-flyer:${key}`, value)
+    } catch {
+      // storage blocked: the best score just isn't remembered
+    }
+  },
+}
+
+/** Mounts the 3D flyer into the element's shadow root. Resolves to a dispose function. */
+export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: string): Promise<() => void> {
+  const $ = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector)!
+
+  const renderer = new THREE.WebGPURenderer({ canvas: $<HTMLCanvasElement>('canvas'), antialias: true, alpha: true })
+  await renderer.init()
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+  renderer.setClearColor(0x000000, 0)
+  console.info(`[vocalis-flyer] rendering with ${'isWebGLBackend' in renderer.backend ? 'WebGL 2' : 'WebGPU'}`)
+
+  const loader = new THREE.TextureLoader()
+  const load = async (url: string) => {
+    const texture = await loader.loadAsync(url)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 8
+    return texture
+  }
+  const front = await load(frontUrl)
+  const back = backUrl ? await load(backUrl) : null
+
+  const scene = new THREE.Scene()
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 1, 60)
+  camera.position.z = WORLD_H / 2 / Math.tan(THREE.MathUtils.degToRad(FOV / 2)) // WORLD_H visible at z = 0
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6)
+  sun.position.set(2, 5, 10)
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x999999, 1.6), sun)
+
+  // Paper
+  const paper = createPaper()
+  const positions = new THREE.BufferAttribute(paper.positions, 3)
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', positions)
+  geometry.setAttribute('uv', new THREE.BufferAttribute(paper.uvs, 2))
+  const sheet = new THREE.Group()
+  for (const material of [
+    new THREE.MeshStandardMaterial({ map: front, roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({ map: back, color: back ? 0xffffff : 0xf3f0e8, roughness: 0.9, side: THREE.BackSide }),
+  ]) {
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.frustumCulled = false
+    sheet.add(mesh)
+  }
+  const plane = new THREE.Group()
+  plane.add(sheet)
+  scene.add(plane)
+
+  paper.foldAt(paper.steps)
+  geometry.computeBoundingBox()
+  const planePivot = geometry.boundingBox!.getCenter(new THREE.Vector3())
+  const flyerPivot = new THREE.Vector3(SHEET_W / 2, SHEET_H / 2, 0)
+  // Sheet axes → game: the nose (sheet +y) flies right, the wings (sheet -z, above the keel) are up.
+  const planeBasis = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0)),
+  )
+  const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), PLANE_TILT)
+  const zAxis = new THREE.Vector3(0, 0, 1)
+  const flyerPose = new THREE.Quaternion()
+  const gamePose = new THREE.Quaternion()
+
+  // Obstacles. Placeholder boxes until the objects from the concert program are decided.
+  const obstacleGeometry = new THREE.BoxGeometry(OBSTACLE_W, WORLD_H, OBSTACLE_W)
+  const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 })
+  const obstacles: THREE.Group[] = []
+  function createObstacle(): THREE.Group {
+    const group = new THREE.Group()
+    const top = new THREE.Mesh(obstacleGeometry, obstacleMaterial)
+    const bottom = new THREE.Mesh(obstacleGeometry, obstacleMaterial)
+    top.position.y = GAP / 2 + WORLD_H / 2
+    bottom.position.y = -GAP / 2 - WORLD_H / 2
+    group.add(top, bottom)
+    scene.add(group)
+    return group
+  }
+
+  // State
+  let state: State = 'flyer'
+  let worldW = WORLD_H
+  let flyerScale = 1
+  let game = createGame(worldW)
+  let u = 0 // 0 = flat flyer, paper.steps = folded, paper.steps + 1 = plane in game position
+  let shownFold = -1
+  let acc = 0
+  let last = performance.now()
+  let diedAt = 0
+  let best = Number(storage.get('best')) || 0
+  let dirty = true // the static flyer only re-renders when something changed
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const scoreText = $('.score')
+  const poster = $<HTMLImageElement>('.poster')
+  const setState = (next: State) => {
+    state = next
+    host.setAttribute('state', next)
+  }
+
+  // Audio
+  let audio: AudioContext | undefined
+  let muted = storage.get('muted') === '1'
+  const buffers = new Map<string, AudioBuffer>()
+  const muteButton = $<HTMLButtonElement>('.mute')
+  const renderMute = () => {
+    muteButton.textContent = muted ? 'Ton an' : 'Ton aus'
+    muteButton.setAttribute('aria-pressed', String(muted))
+  }
+  muteButton.hidden = Object.keys(sounds).length === 0
+  renderMute()
+
+  // Browsers only allow audio after a user gesture, so this runs on the first tap.
+  function unlockAudio(): void {
+    if (audio) return void audio.resume()
+    const context = (audio = new AudioContext())
+    for (const [path, url] of Object.entries(sounds)) {
+      const name = path.slice(path.lastIndexOf('/') + 1, path.lastIndexOf('.'))
+      fetch(url)
+        .then((response) => response.arrayBuffer())
+        .then((data) => context.decodeAudioData(data))
+        .then((buffer) => buffers.set(name, buffer))
+        .catch((error: unknown) => console.warn(`[vocalis-flyer] sound "${name}" failed`, error))
+    }
+  }
+
+  function play(name: string): void {
+    const buffer = buffers.get(name)
+    if (!audio || muted || !buffer) return
+    const source = audio.createBufferSource()
+    source.buffer = buffer
+    source.connect(audio.destination)
+    source.start()
+  }
+
+  // Actions
+  function fold(): void {
+    unlockAudio()
+    play('fold')
+    setState('folding')
+  }
+
+  function toReady(): void {
+    game = createGame(worldW)
+    acc = 0
+    scoreText.textContent = '0'
+    setState('ready')
+  }
+
+  function tap(): void {
+    unlockAudio()
+    if (state === 'ready') setState('play')
+    if (state === 'play' && flap(game)) play('flap')
+  }
+
+  function retry(): void {
+    if (performance.now() - diedAt > RETRY_DELAY) toReady()
+  }
+
+  function gameOver(): void {
+    diedAt = performance.now()
+    best = Math.max(best, game.score)
+    storage.set('best', String(best))
+    $('.over-score').textContent = String(game.score)
+    $('.over-best').textContent = String(best)
+    play('hit')
+    setState('over')
+  }
+
+  // Input. Flyer and game-over react to click, so scrolling past on touch never triggers anything;
+  // flying reacts to pointerdown for responsiveness.
+  const abort = new AbortController()
+  const { signal } = abort
+  host.addEventListener(
+    'click',
+    () => {
+      if (state === 'flyer') fold()
+      else if (state === 'over') retry()
+    },
+    { signal },
+  )
+  host.addEventListener('pointerdown', (event) => event.button === 0 && tap(), { signal })
+  host.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.repeat || !['Space', 'ArrowUp', 'KeyW', 'Enter'].includes(event.code)) return
+      if (event.composedPath()[0] instanceof HTMLButtonElement) return
+      event.preventDefault()
+      if (state === 'flyer') fold()
+      else if (state === 'over') retry()
+      else tap()
+    },
+    { signal },
+  )
+  const backButton = $<HTMLButtonElement>('.back')
+  for (const button of [backButton, muteButton]) {
+    for (const type of ['pointerdown', 'click']) button.addEventListener(type, (event) => event.stopPropagation(), { signal })
+  }
+  backButton.addEventListener(
+    'click',
+    () => {
+      play('unfold')
+      setState('unfolding')
+    },
+    { signal },
+  )
+  muteButton.addEventListener(
+    'click',
+    () => {
+      muted = !muted
+      storage.set('muted', muted ? '1' : '0')
+      renderMute()
+    },
+    { signal },
+  )
+
+  // Loop
+  function frame(now: number): void {
+    const dt = Math.min((now - last) / 1000, 0.1)
+    last = now
+    if (state === 'folding' || state === 'unfolding') {
+      const seconds = (u < paper.steps ? STEP_SECONDS : FLIGHT_SECONDS) / (reducedMotion ? 50 : 1)
+      u = Math.min(Math.max(u + (state === 'folding' ? dt : -dt) / seconds, 0), paper.steps + 1)
+      if (u === paper.steps + 1) toReady()
+      else if (u === 0) setState('flyer')
+    } else if (state === 'ready') {
+      game.y = Math.sin(now / 400) * 0.15
+    } else if (state === 'play' || state === 'over') {
+      for (acc += dt; acc >= DT; acc -= DT) {
+        const { scored, hit } = step(game)
+        if (scored) {
+          scoreText.textContent = String(game.score)
+          play('score')
+        }
+        if (hit) gameOver()
+      }
+    } else if (!dirty) {
+      return
+    }
+    dirty = false
+    draw()
+  }
+
+  function draw(): void {
+    const folded = Math.min(u, paper.steps)
+    if (folded !== shownFold) {
+      shownFold = folded
+      const k = Math.floor(folded)
+      paper.foldAt(k + smooth(folded - k))
+      positions.needsUpdate = true
+      geometry.computeVertexNormals()
+    }
+
+    const f = smooth(Math.max(u - paper.steps, 0))
+    plane.scale.setScalar(THREE.MathUtils.lerp(flyerScale, PLANE_SCALE, f))
+    plane.position.set(game.planeX * f, game.y * f, 0)
+    sheet.position.lerpVectors(flyerPivot, planePivot, f).negate()
+    gamePose.setFromAxisAngle(zAxis, pitch(game)).multiply(tilt).multiply(planeBasis)
+    plane.quaternion.slerpQuaternions(flyerPose, gamePose, f)
+
+    const showObstacles = state === 'ready' || state === 'play' || state === 'over'
+    game.obstacles.forEach((o, i) => (obstacles[i] ??= createObstacle()).position.set(o.x, o.gapY, 0))
+    obstacles.forEach((group, i) => (group.visible = showObstacles && i < game.obstacles.length))
+
+    renderer.render(scene, camera)
+    poster.hidden = true // only now, so a background tab keeps showing the flyer image until the first frame
+  }
+
+  const resizeObserver = new ResizeObserver(([entry]) => {
+    const { width, height } = entry.contentRect
+    if (!width || !height) return
+    renderer.setSize(width, height, false)
+    camera.aspect = width / height
+    camera.updateProjectionMatrix()
+    worldW = WORLD_H * camera.aspect
+    flyerScale = 0.85 * Math.min(WORLD_H / SHEET_H, worldW / SHEET_W) // matches the poster's CSS size
+    resize(game, worldW)
+    dirty = true
+  })
+  resizeObserver.observe(host)
+
+  // Only animate while on screen and the tab is visible.
+  let inView = true
+  const run = () => {
+    last = performance.now()
+    void renderer.setAnimationLoop(inView && !document.hidden ? frame : null)
+  }
+  const intersection = new IntersectionObserver(([entry]) => {
+    inView = entry.isIntersecting
+    run()
+  })
+  intersection.observe(host)
+  document.addEventListener('visibilitychange', run, { signal })
+  run()
+
+  return () => {
+    abort.abort()
+    resizeObserver.disconnect()
+    intersection.disconnect()
+    void renderer.setAnimationLoop(null)
+    renderer.dispose()
+    void audio?.close()
+  }
+}
