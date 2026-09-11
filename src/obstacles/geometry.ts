@@ -19,25 +19,40 @@ export function pose(x: number, y: number, yaw: number, tilt: number, z = 0): TH
 }
 
 /** Merges geometries into one non-indexed geometry with per-triangle vertex colours. */
+// Runs on every spawn (straps, clips, sticks), so no per-triangle allocations, and colour strings are parsed once.
+const parsed = new Map<string | number, THREE.Color>()
 export function merge(parts: [THREE.BufferGeometry, Paint][]): THREE.BufferGeometry {
-  const positions: number[] = []
-  const colors: number[] = []
-  const tint = new THREE.Color()
-  for (const [geometry, paintTriangle] of parts) {
+  const sources = parts.map(([geometry, paintTriangle]) => {
     const p = (geometry.index ? geometry.toNonIndexed() : geometry).getAttribute('position')
+    return { p, paintTriangle }
+  })
+  const vertices = sources.reduce((n, { p }) => n + p.count, 0)
+  const positions = new Float32Array(vertices * 3)
+  const colors = new Float32Array(vertices * 3)
+  const centroid: V3 = [0, 0, 0] // reused: paints read it right away
+  let v = 0
+  for (const { p, paintTriangle } of sources) {
     for (let t = 0; t < p.count / 3; t++) {
-      const corners = [0, 1, 2].map((c) => [p.getX(t * 3 + c), p.getY(t * 3 + c), p.getZ(t * 3 + c)])
-      const centroid = [0, 1, 2].map((axis) => (corners[0][axis] + corners[1][axis] + corners[2][axis]) / 3) as V3
-      tint.set(paintTriangle(t, centroid))
-      for (const corner of corners) {
-        positions.push(...corner)
-        colors.push(tint.r, tint.g, tint.b)
+      const a = t * 3
+      centroid[0] = (p.getX(a) + p.getX(a + 1) + p.getX(a + 2)) / 3
+      centroid[1] = (p.getY(a) + p.getY(a + 1) + p.getY(a + 2)) / 3
+      centroid[2] = (p.getZ(a) + p.getZ(a + 1) + p.getZ(a + 2)) / 3
+      const value = paintTriangle(t, centroid)
+      let tint = value instanceof THREE.Color ? value : parsed.get(value)
+      if (!tint) parsed.set(value as string | number, (tint = new THREE.Color(value)))
+      for (let c = a; c < a + 3; c++, v += 3) {
+        positions[v] = p.getX(c)
+        positions[v + 1] = p.getY(c)
+        positions[v + 2] = p.getZ(c)
+        colors[v] = tint.r
+        colors[v + 1] = tint.g
+        colors[v + 2] = tint.b
       }
     }
   }
   const merged = new THREE.BufferGeometry()
-  merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  merged.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   merged.computeVertexNormals()
   return merged
 }

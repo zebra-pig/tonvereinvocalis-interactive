@@ -69,7 +69,7 @@ scripts/perf.ts       `pnpm run perf [--device phone|desktop] [--cpu 4] [--secon
 - **States:** `flyer → folding → ready → play → over`
   - From `over`: tap retries (→ `ready`).
   - "Zurück zum Flyer" runs the fold in reverse (→ `flyer`).
-- **Sizing:** the host is `display:block`, and Webstudio sets its size. A `ResizeObserver` updates the renderer, with device pixel ratio capped at 2.
+- **Sizing:** the host is `display:block`, and Webstudio sets its size. A `ResizeObserver` updates the renderer, with device pixel ratio capped at 2 (1.5 on touch devices, whose GPUs are slower).
   - The game world has a fixed height; its visible width follows the aspect ratio, so wide screens see further ahead.
   - The A4 sheet is fitted into the box with padding.
 - **Input:**

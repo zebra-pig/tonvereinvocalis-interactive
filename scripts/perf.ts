@@ -245,12 +245,13 @@ const startup = await page.evaluate(async () => {
 const state = () => page.evaluate(() => document.querySelector('vocalis-flyer-interaktiv')?.getAttribute('state'))
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 async function measure(phase: string, act: () => Promise<void>) {
+  await cdp.send('Profiler.start')
+  await sleep(500) // starting the profiler stalls the page for a few hundred ms: keep that out of the measurement
   await page.evaluate(() => {
     const p = window.__perf
     Object.assign(p, { recording: true, stamps: [], js: [], spawns: [], updateMs: 0, physicsMs: 0 })
     if (p.three) Object.assign(p.three, { builds: [], pipelines: [], gpuMs: [] })
   })
-  await cdp.send('Profiler.start')
   await act()
   const { profile } = await cdp.send('Profiler.stop')
   writeFileSync(`${out}${name}-${phase}.cpuprofile`, JSON.stringify(profile))

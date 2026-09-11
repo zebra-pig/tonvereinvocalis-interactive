@@ -124,7 +124,7 @@ export function controllers(gapTop: number, random: () => number, disposables: D
         new THREE.Vector3(x - bend * 0.6, THREE.MathUtils.lerp(start.y, end.y, 0.65), lane),
         end,
       ]),
-      32,
+      16, // plenty for a gentle S; built on every spawn
       0.016,
       4,
     )

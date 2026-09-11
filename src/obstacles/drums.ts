@@ -201,7 +201,13 @@ const drumGeometry = (() => {
 
 const ring = (radius: number, y: number) =>
   Array.from({ length: 32 }, (_, k) => [Math.sin((k / 32) * Math.PI * 2) * radius, y, Math.cos((k / 32) * Math.PI * 2) * radius]).flat()
-const DRUM_HULL = Array.from(drumGeometry.getAttribute('position').array)
+// Unique positions only: the same point set as the geometry, with a third of the vertices to transform per fit.
+const DRUM_HULL = (() => {
+  const a = drumGeometry.getAttribute('position').array
+  const unique = new Map<string, number[]>()
+  for (let i = 0; i < a.length; i += 3) unique.set(`${a[i]},${a[i + 1]},${a[i + 2]}`, [a[i], a[i + 1], a[i + 2]])
+  return [...unique.values()].flat()
+})()
 // Hanging drums also carry the sling of the drum below.
 const HANG_HULL = [...DRUM_HULL, ...ring(STRAND_R + 0.055, -H / 2 - 0.03), ...ring(STRAND_R + 0.055, -H / 2 + HOOP_H + STRAP_W)]
 
@@ -267,16 +273,22 @@ function band(points: THREE.Vector3[], normals: THREE.Vector3[], colors: string[
     const normal = normals[i].clone().addScaledVector(tangent, -normals[i].dot(tangent)).normalize()
     return { p, normal, side: new THREE.Vector3().crossVectors(tangent, normal) }
   })
-  const corner = (f: (typeof frames)[number], across: number, depth: number): V3 => {
-    const v = f.p.clone().addScaledVector(f.side, (across * STRAP_W) / 2).addScaledVector(f.normal, (depth * STRAP_T) / 2)
-    return [v.x, v.y, v.z]
+  // Written straight into a flat array: this runs for every strap segment of every spawned column.
+  const positions: number[] = []
+  const corner = (f: (typeof frames)[number], across: number, depth: number) => {
+    const a = (across * STRAP_W) / 2
+    const d = (depth * STRAP_T) / 2
+    positions.push(f.p.x + f.side.x * a + f.normal.x * d, f.p.y + f.side.y * a + f.normal.y * d, f.p.z + f.side.z * a + f.normal.z * d)
   }
-  const tris: V3[][] = []
   const tints: THREE.ColorRepresentation[] = []
   const dark = new THREE.Color(colors[0]).multiplyScalar(0.72)
   const face = (f0: (typeof frames)[number], f1: (typeof frames)[number], a: number, da: number, b: number, db: number, tint: THREE.ColorRepresentation) => {
-    const [p, q, r, s] = [corner(f0, a, da), corner(f1, a, da), corner(f1, b, db), corner(f0, b, db)]
-    tris.push([p, q, r], [p, r, s])
+    corner(f0, a, da) // p q r
+    corner(f1, a, da)
+    corner(f1, b, db)
+    corner(f0, a, da) // p r s
+    corner(f1, b, db)
+    corner(f0, b, db)
     tints.push(tint, tint)
   }
   for (let i = 0; i < (closed ? n : n - 1); i++) {
@@ -287,7 +299,9 @@ function band(points: THREE.Vector3[], normals: THREE.Vector3[], colors: string[
     face(f0, f1, -1, 1, -1, -1, dark)
     face(f0, f1, 1, 1, 1, -1, dark)
   }
-  return [triangles(tris), (t) => tints[t]]
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  return [geometry, (t) => tints[t]]
 }
 
 /** Snap hook in a drum's eyelet; strands end at `top`, `radial` points away from the drum. */

@@ -56,7 +56,8 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   })
   renderer.onDeviceLost = () => host.dispatchEvent(new Event('gpulost'))
   await renderer.init()
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+  // Touch devices: phone GPUs are slow, and the fire shader runs for every pixel of a tall column. MSAA keeps edges clean.
+  renderer.setPixelRatio(Math.min(devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2))
   renderer.setClearColor(0x000000, 0)
   console.info(`[vocalis-flyer-interaktiv] rendering with ${'isWebGLBackend' in renderer.backend ? 'WebGL 2' : 'WebGPU'}`)
 
@@ -306,15 +307,20 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
       view.dispose()
       views.delete(o)
     }
+    let built = false
     for (const o of game.obstacles) {
+      const k = smooth(clamp01(appear * (1 + STAGGER) - STAGGER * clamp01(o.x / worldW + 0.5)))
       let view = views.get(o)
       if (!view) {
+        // A new game has several columns: while they're still hidden, build one per frame instead of all in one.
+        if (k === 0 && built) continue
         view = createObstacleView(o)
         views.set(o, view)
         scene.add(view.group)
+        built = true
       }
       view.group.position.x = o.x
-      view.slide(smooth(clamp01(appear * (1 + STAGGER) - STAGGER * clamp01(o.x / worldW + 0.5))))
+      view.slide(k)
       view.update(now / 1000)
     }
 
