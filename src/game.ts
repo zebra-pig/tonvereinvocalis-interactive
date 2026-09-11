@@ -4,7 +4,7 @@
 export const WORLD_H = 10
 // ponytail: fixed step without render interpolation; interpolate if high-refresh screens judder
 export const DT = 1 / 120
-export const GAP = 2.2
+export const GAP = 2.5
 
 // Obstacle shapes. The scene builds its models from the same numbers, so hitboxes match what you see.
 export const DRUM_R = 0.5
@@ -26,7 +26,7 @@ const GRAVITY = 7.8 // 0.125 px/frame²
 const FLAP_SPEED = 4.5 // 3.6 px/frame
 const SPEED = 2.5 // 2 px/frame
 const SPACING = 5 // one obstacle every 100 frames
-export const RADIUS = 0.36 // plane hitbox radius (bird height/4 + width/4)
+export const RADIUS = 0.3 // plane hitbox radius, slightly forgiving (under bird height/4 + width/4)
 const FIRST_DISTANCE = 6 // ~2.4 s until the first obstacle, even on wide screens
 const LIFT = 16 // updraft acceleration in the middle of a wind column, stronger than gravity
 const MAX_RISE = 5.5 // updrafts can't accelerate the plane beyond this
