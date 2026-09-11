@@ -68,7 +68,7 @@ describe('obstacles', () => {
   for (const top of ['drums', 'lights', 'controllers'] as const) {
     it(`blocks above the gap with hanging ${top}`, () => {
       const game = createGame(10)
-      game.obstacles = [column({ x: game.planeX, top, bottom: null, gapY: -1 })]
+      game.obstacles = [column({ x: game.planeX, top, bottom: null, gapY: -GAP / 2 - 0.5 })]
       expect(step(game).hit).toBe(true)
     })
   }
@@ -76,7 +76,7 @@ describe('obstacles', () => {
   for (const bottom of ['drums', 'phones', 'tires'] as const) {
     it(`blocks below the gap with piled ${bottom}`, () => {
       const game = createGame(10)
-      game.obstacles = [column({ x: game.planeX, top: null, bottom, gapY: 1.5 })]
+      game.obstacles = [column({ x: game.planeX, top: null, bottom, gapY: GAP / 2 + 0.5 })]
       expect(step(game).hit).toBe(true)
     })
   }

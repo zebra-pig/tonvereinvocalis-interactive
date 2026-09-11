@@ -4,7 +4,7 @@
 export const WORLD_H = 10
 // ponytail: fixed step without render interpolation; interpolate if high-refresh screens judder
 export const DT = 1 / 120
-export const GAP = 2.5
+export const GAP = 3
 
 // Obstacle shapes. The scene builds its models from the same numbers, so hitboxes match what you see.
 export const DRUM_R = 0.5
