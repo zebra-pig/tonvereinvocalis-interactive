@@ -255,8 +255,8 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
       const speed = reducedMotion ? 50 : 1
       t = Math.min(Math.max(t + (state === 'folding' ? dt : -dt) * speed, 0), end)
       if (state === 'folding') game.y = bob(now)
-      if (t === end) setState('ready')
-      else if (t === 0) setState('flyer')
+      if (state === 'folding' && t >= end) setState('ready')
+      else if (state === 'unfolding' && t <= 0) setState('flyer')
     } else if (state === 'ready') {
       game.y = bob(now)
     } else if (state === 'play' || state === 'over') {
