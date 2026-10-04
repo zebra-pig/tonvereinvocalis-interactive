@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "perf": "node scripts/perf.ts"
+    "perf": "node scripts/perf.ts",
+    "flyer": "for s in front back; do sips -Z 1754 -m \"/System/Library/ColorSync/Profiles/sRGB Profile.icc\" -s format jpeg -s formatOptions 80 ~/Desktop/vocalis-flyer/flyer-${s}_1.jpg --out src/assets/flyer-$s.jpg; done"
   },
   "devDependencies": {
     "@types/node": "^24.13.4",

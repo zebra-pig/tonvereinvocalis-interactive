@@ -60,6 +60,10 @@ src/obstacles/        one file per obstacle kind: drums, matterhorn, fire, wind,
                       index.ts builds the view for an obstacle, geometry.ts holds shared model helpers
 src/**/*.test.ts      Vitest tests next to the code they cover (`pnpm test`)
 src/assets/           flyer-front.*, flyer-back.* (optional), sfx/*
+preview.html          dev server only (`pnpm dev` → /preview.html): the artwork on the folded plane, to turn and inspect
+src/preview.ts        … its script: fold slider and orbit camera, reusing fold.ts; never in builds
+src/manual.ts         dev server only: the fold steps as SVG diagrams (figures()/manual()), drawn from fold.ts; source of the
+                      folding manual printed on the flyer
 scripts/perf.ts       `pnpm run perf [--device phone|desktop] [--cpu 4] [--seconds 30]`: plays the game in headless
                       Chrome on an instrumented production build and prints ranked, actionable performance insights
 ```
@@ -163,6 +167,8 @@ pnpm run typecheck    # tsc --noEmit (add --watch while developing)
 pnpm run build        # tsc --noEmit && vite build → dist/: vocalis-flyer-interaktiv.js, assets/, _headers (no test site)
 pnpm run preview      # build + wrangler dev (serves dist with _headers like production)
 pnpm test             # Vitest: game rules, hitboxes, wind, fold geometry
+pnpm run flyer        # macOS: copies the Affinity export (~/Desktop/vocalis-flyer/flyer-{front,back}_1.jpg) to src/assets as sRGB;
+                      # `pnpm dev` runs it by itself whenever Affinity exports again
 ```
 
 Type errors never reach production: Workers Builds runs `pnpm run build`, which stops at `tsc`.

@@ -18,6 +18,7 @@ const FLIGHT_ARC = 0.6 // world units the plane rises mid-flight
 const ENTER_SECONDS = 0.6 // obstacles sliding in after a retry (otherwise they follow the flight)
 const STAGGER = 0.4 // obstacles further right arrive later, as a wave
 const LEAN = 0.35 // radians the sheet leans back while folding, so the folds read in depth
+const FLIP = 0.25 // share of the fold during which the sheet turns over: it folds on its back, the front ends up outside
 const PLANE_SCALE = 0.005 // mm → world units, the plane ends up ~1 unit long
 const PLANE_TILT = 0.8 // roll towards the camera so the wings read from the side
 const FOV = 30
@@ -70,6 +71,11 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
   const front = await load(frontUrl)
   const back = backUrl ? await load(backUrl) : null
+  if (back) {
+    // The back is seen from behind: without this the artwork would read mirrored.
+    back.wrapS = THREE.RepeatWrapping
+    back.repeat.x = -1
+  }
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(FOV, 1, 1, 60)
@@ -84,10 +90,13 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', positions)
   geometry.setAttribute('uv', new THREE.BufferAttribute(paper.uvs, 2))
+  // fold.ts folds towards the front. Mirrored in z it folds towards the back instead, so the artwork ends up outside;
+  // mirroring swaps which face counts as the front one, hence the swapped sides.
   const sheet = new THREE.Group()
+  sheet.scale.z = -1
   for (const material of [
-    new THREE.MeshStandardMaterial({ map: front, roughness: 0.9 }),
-    new THREE.MeshStandardMaterial({ map: back, color: back ? 0xffffff : 0xf3f0e8, roughness: 0.9, side: THREE.BackSide }),
+    new THREE.MeshStandardMaterial({ map: front, roughness: 0.9, side: THREE.BackSide }),
+    new THREE.MeshStandardMaterial({ map: back, color: back ? 0xffffff : 0xf3f0e8, roughness: 0.9 }),
   ]) {
     const mesh = new THREE.Mesh(geometry, material)
     mesh.frustumCulled = false
@@ -101,12 +110,14 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   paper.foldAt(1)
   geometry.computeBoundingBox()
   const planeCentre = geometry.boundingBox!.getCenter(new THREE.Vector3())
+  planeCentre.z *= -1 // mirrored, like the sheet
   sheet.position.copy(planeCentre).negate()
   const flyerOffset = planeCentre.clone().sub(new THREE.Vector3(SHEET_W / 2, SHEET_H / 2, 0)) // keeps the sheet centred
   const from = new THREE.Vector3()
   const to = new THREE.Vector3()
   const turn = new THREE.Quaternion()
   const xAxis = new THREE.Vector3(1, 0, 0)
+  const yAxis = new THREE.Vector3(0, 1, 0)
   const zAxis = new THREE.Vector3(0, 0, 1)
 
   // Obstacles: one view per obstacle, created when it spawns and disposed when it's gone.
@@ -296,6 +307,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
       .multiply(turn.setFromAxisAngle(xAxis, (Math.PI / 2 + PLANE_TILT) * f))
       .multiply(turn.setFromAxisAngle(zAxis, (-Math.PI / 2) * f))
       .multiply(turn.setFromAxisAngle(xAxis, -LEAN * Math.sin(Math.PI * folded)))
+      .multiply(turn.setFromAxisAngle(yAxis, Math.PI * smooth(clamp01(folded / FLIP)))) // the mirrored plane, turned over, is the plane again
 
     // Obstacles slide in with the flight (top ones from above, bottom ones from below) and back out when
     // unfolding. After a retry the new ones slide in on their own timer.
