@@ -28,6 +28,8 @@ const flyerExport = (): Plugin => ({
 })
 
 export default defineConfig({
+  // Relative: the embed runs on another origin (Webstudio), so the artwork must resolve against the script, not the page.
+  base: './',
   plugins: [flyerExport()],
   server: {
     // Cloudflare quick tunnels. Using a named tunnel? Add its hostname here.
