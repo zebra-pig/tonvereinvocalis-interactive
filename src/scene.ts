@@ -12,13 +12,14 @@ const backUrl = Object.values(
   import.meta.glob<string>('./assets/flyer-back.*', { eager: true, query: '?url', import: 'default' }),
 )[0]
 
+const FLIP_SECONDS = 0.5 // time in seconds for the initial flip
 const FOLD_SECONDS = 1.5
+const FLIGHT_START = FLIP_SECONDS + 1.0 // time in seconds when the "flight" animation starts
 const FLIGHT_SECONDS = 0.8 // folded sheet → plane at its start position
 const FLIGHT_ARC = 0.6 // world units the plane rises mid-flight
 const ENTER_SECONDS = 0.6 // obstacles sliding in after a retry (otherwise they follow the flight)
 const STAGGER = 0.4 // obstacles further right arrive later, as a wave
 const LEAN = 0.35 // radians the sheet leans back while folding, so the folds read in depth
-const FLIP = 0.25 // share of the fold during which the sheet turns over: it folds on its back, the front ends up outside
 const PLANE_SCALE = 0.005 // mm → world units, the plane ends up ~1 unit long
 const PLANE_TILT = 0.8 // roll towards the camera so the wings read from the side
 const FOV = 30
@@ -140,7 +141,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   let worldW = WORLD_H
   let flyerScale = 1
   let game = createGame(worldW)
-  let t = 0 // seconds into fold + flight: 0 = flat flyer, FOLD_SECONDS + FLIGHT_SECONDS = plane at start position
+  let t = 0 // seconds into flip, fold and flight: 0 = flat flyer, FLIP_SECONDS + FOLD_SECONDS + FLIGHT_SECONDS = plane at start position
   let shownFold = -1
   let acc = 0
   let last = performance.now()
@@ -262,7 +263,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     const dt = Math.min((now - last) / 1000, 0.1)
     last = now
     if (state === 'folding' || state === 'unfolding') {
-      const end = FOLD_SECONDS + FLIGHT_SECONDS
+      const end = FLIP_SECONDS + FOLD_SECONDS + FLIGHT_SECONDS
       const speed = reducedMotion ? 50 : 1
       t = Math.min(Math.max(t + (state === 'folding' ? dt : -dt) * speed, 0), end)
       if (state === 'folding') game.y = bob(now)
@@ -287,7 +288,8 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   }
 
   function draw(now: number): void {
-    const folded = Math.min(t / FOLD_SECONDS, 1)
+    const flipped = Math.min(t / FLIP_SECONDS, 1)
+    const folded = clamp01((t - FLIP_SECONDS) / FOLD_SECONDS)
     if (folded !== shownFold) {
       shownFold = folded
       paper.foldAt(folded)
@@ -297,17 +299,17 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
 
     // Flight: from the centred flyer to the game position in a small arc, shrinking, turning nose-right
     // and rolling the wings up. At f = 0 this is exactly the flyer pose, at f = 1 exactly the game pose.
-    const f = smooth(clamp01((t - FOLD_SECONDS) / FLIGHT_SECONDS))
+    const f = smooth(clamp01((t - FLIGHT_START) / FLIGHT_SECONDS))
     from.copy(flyerOffset).multiplyScalar(flyerScale)
     plane.position.lerpVectors(from, to.set(game.planeX, game.y, 0), f)
     plane.position.y += Math.sin(Math.PI * f) * FLIGHT_ARC
     plane.scale.setScalar(THREE.MathUtils.lerp(flyerScale, PLANE_SCALE, f))
     plane.quaternion
       .setFromAxisAngle(zAxis, pitch(game) * f)
-      .multiply(turn.setFromAxisAngle(xAxis, (Math.PI / 2 + PLANE_TILT) * f))
       .multiply(turn.setFromAxisAngle(zAxis, (-Math.PI / 2) * f))
+      .multiply(turn.setFromAxisAngle(yAxis, (Math.PI / 2 + PLANE_TILT) * clamp01(3 * f)))
       .multiply(turn.setFromAxisAngle(xAxis, -LEAN * Math.sin(Math.PI * folded)))
-      .multiply(turn.setFromAxisAngle(yAxis, Math.PI * smooth(clamp01(folded / FLIP)))) // the mirrored plane, turned over, is the plane again
+      .multiply(turn.setFromAxisAngle(yAxis, Math.PI * smooth(flipped))) // the mirrored plane, turned over, is the plane again
 
     // Obstacles slide in with the flight (top ones from above, bottom ones from below) and back out when
     // unfolding. After a retry the new ones slide in on their own timer.
