@@ -8,10 +8,14 @@ import { createPaper } from './fold.ts'
 const [frontUrl] = Object.values(import.meta.glob<string>('./assets/flyer-front.*', { eager: true, query: '?url', import: 'default' }))
 const [backUrl] = Object.values(import.meta.glob<string>('./assets/flyer-back.*', { eager: true, query: '?url', import: 'default' }))
 
-const renderer = new THREE.WebGPURenderer({ antialias: true })
+// ?shot=x,y,z: the plane alone on a transparent canvas, seen from there (for the digital graphics).
+// With &from=x,y,z, window.setT(0–1) folds the sheet while the camera travels from there to the shot.
+const params = new URLSearchParams(location.search)
+const shot = params.get('shot')
+const renderer = new THREE.WebGPURenderer({ antialias: true, alpha: !!shot })
 await renderer.init()
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
-renderer.setClearColor(0xd9dde2)
+renderer.setClearColor(0xd9dde2, shot ? 0 : 1)
 document.body.append(renderer.domElement)
 
 const load = async (url: string | undefined, mirror = false) => {
@@ -30,7 +34,7 @@ const [front, back] = await Promise.all([load(frontUrl), load(backUrl, true)])
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(30, 1, 10, 5000)
-camera.position.set(-300, 220, 420)
+camera.position.set(...((shot ? shot.split(',').map(Number) : [-300, 220, 420]) as [number, number, number]))
 const sun = new THREE.DirectionalLight(0xffffff, 1.6)
 sun.position.set(2, 5, 10)
 scene.add(new THREE.HemisphereLight(0xffffff, 0x999999, 1.6), sun)
@@ -69,7 +73,17 @@ function fold(): void {
   sheet.position.set(centre.x, -centre.y, -centre.z) // orbit around the middle (x and z flipped by the mirror and turn)
 }
 fold()
-new GUI({ title: 'Flyer' }).add(settings, 'fold', 0, 1, 0.001).name('Falten').onChange(fold)
+if (shot) {
+  const [to, from] = [shot, params.get('from') ?? shot].map((at) => new THREE.Vector3(...(at.split(',').map(Number) as [number, number, number])))
+  Object.assign(window, {
+    setT(t: number) {
+      settings.fold = t
+      fold()
+      camera.position.lerpVectors(from, to, t * t * (3 - 2 * t))
+    },
+  })
+}
+if (!shot) new GUI({ title: 'Flyer' }).add(settings, 'fold', 0, 1, 0.001).name('Falten').onChange(fold)
 
 // New export (vite.config.ts sends this): swap the artwork in place, keeping the view and the fold.
 import.meta.hot?.on('flyer', async () => {
