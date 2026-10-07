@@ -12,6 +12,7 @@ const backUrl = Object.values(
   import.meta.glob<string>('./assets/flyer-back.*', { eager: true, query: '?url', import: 'default' }),
 )[0]
 
+const PADDING_TOP = 170 // px. padding to leave at the top in the flyer state
 const FOLD_SECONDS = 1.5
 const FLIGHT_SECONDS = 0.8 // folded sheet → plane at its start position
 const FLIGHT_ARC = 0.6 // world units the plane rises mid-flight
@@ -112,7 +113,8 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   const planeCentre = geometry.boundingBox!.getCenter(new THREE.Vector3())
   planeCentre.z *= -1 // mirrored, like the sheet
   sheet.position.copy(planeCentre).negate()
-  const flyerOffset = planeCentre.clone().sub(new THREE.Vector3(SHEET_W / 2, SHEET_H / 2, 0)) // keeps the sheet centred
+  const flyerOffset = planeCentre.clone().sub(new THREE.Vector3(SHEET_W / 2, SHEET_H / 2, 0)) // keeps the sheet centered
+  const flyerPosition = new THREE.Vector3(0, 0, 0)
   const from = new THREE.Vector3()
   const to = new THREE.Vector3()
   const turn = new THREE.Quaternion()
@@ -138,6 +140,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   // State
   let state: State = 'flyer'
   let worldW = WORLD_H
+  let padding_top = PADDING_TOP
   let flyerScale = 1
   let game = createGame(worldW)
   let t = 0 // seconds into fold + flight: 0 = flat flyer, FOLD_SECONDS + FLIGHT_SECONDS = plane at start position
@@ -298,7 +301,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     // Flight: from the centred flyer to the game position in a small arc, shrinking, turning nose-right
     // and rolling the wings up. At f = 0 this is exactly the flyer pose, at f = 1 exactly the game pose.
     const f = smooth(clamp01((t - FOLD_SECONDS) / FLIGHT_SECONDS))
-    from.copy(flyerOffset).multiplyScalar(flyerScale)
+    from.copy(flyerOffset).multiplyScalar(flyerScale).add(flyerPosition)
     plane.position.lerpVectors(from, to.set(game.planeX, game.y, 0), f)
     plane.position.y += Math.sin(Math.PI * f) * FLIGHT_ARC
     plane.scale.setScalar(THREE.MathUtils.lerp(flyerScale, PLANE_SCALE, f))
@@ -348,7 +351,10 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
     camera.aspect = width / height
     camera.updateProjectionMatrix()
     worldW = WORLD_H * camera.aspect
-    flyerScale = 0.85 * Math.min(WORLD_H / SHEET_H, worldW / SHEET_W) // matches the poster's CSS size
+    const padding_top_world = padding_top / height * WORLD_H
+    flyerScale = 0.90 * Math.min((WORLD_H - padding_top_world) / SHEET_H, worldW / SHEET_W) // matches the poster's CSS size
+    const flyerHeight = flyerScale * SHEET_H;
+    flyerPosition.set(0, ((WORLD_H - padding_top_world - flyerHeight) - padding_top_world) * 0.5, 0)
     resize(game, worldW)
     dirty = true
   })

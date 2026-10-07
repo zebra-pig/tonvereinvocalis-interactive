@@ -8,14 +8,19 @@ const template = `
       display: block; position: relative; overflow: hidden; container-type: size;
       touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
       cursor: pointer; outline: none;
+      --padding-top: 170px;
     }
     :host([state="ready"]), :host([state="play"]) { touch-action: none; }
     :host(:focus-visible) { outline: 2px solid; outline-offset: -2px; }
     [hidden] { display: none !important; }
     canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .poster-container {
+      position: absolute; top: var(--padding-top); width: 100%; height: calc(100% - var(--padding-top));
+      display: flex; justify-content: center; align-items: start;
+    }
     .poster {
-      position: absolute; inset: 0; margin: auto; object-fit: cover;
-      width: min(85cqw, 85cqh * 210 / 297); height: auto; aspect-ratio: 210 / 297;
+      position: relative; inset: 0; object-fit: cover;
+      width: min(90cqw, 0.90 * (100cqh - var(--padding-top)) * 210 / 297); height: auto; aspect-ratio: 210 / 297;
     }
     .ui { position: absolute; inset: 0; pointer-events: none; font: 1rem/1.3 "Be Vietnam Pro", system-ui, sans-serif; color: #000; }
     .ui p { margin: 0; }
@@ -39,7 +44,9 @@ const template = `
     .back { left: 1rem; }
     .mute { right: 1rem; }
   </style>
-  <img class="poster" alt="Konzertflyer" />
+  <div class="poster-container">
+    <img class="poster" alt="Konzertflyer" />
+  </div>
   <canvas role="img" aria-label="Konzertflyer. Tippen zum Falten, dann tippen zum Fliegen."></canvas>
   <div class="ui">
     <p class="hint hint-fold">Tippen zum Falten</p>
