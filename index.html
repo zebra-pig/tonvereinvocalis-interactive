@@ -11,6 +11,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Be+Vietnam+Pro:ital,wght@0,400;0,700;1,400&display=swap"
     />
+    <link rel="preload" as="image" href="Vocalis Logo.svg" />
     <style>
       /* Mimics a tonvereinvocalis.ch/konzerte/* page. Everything here except <vocalis-flyer-interaktiv> lives in Webstudio. */
       * { box-sizing: border-box; }
@@ -21,14 +22,15 @@
         background: linear-gradient(135deg, #c5e8fb, #e6e6e6);
       }
       h2 { font: 1.9rem/1 "Bebas Neue", sans-serif; margin: 0 0 0.5rem; }
-      .wrap { width: min(100% - 2.5rem, 54rem); margin-inline: auto; }
+      .wrap { width: min(100%, 1000px); margin-inline: auto; padding-inline: 50px }
       header {
-        position: absolute; inset: 0 0 auto; z-index: 1; pointer-events: none;
-        display: flex; justify-content: space-between; align-items: center; padding-block: 1.75rem;
+        position: absolute; height: 200px; inset: 0 0 auto;
+        display: flex; justify-content: space-between; align-items: center; gap: 1rem;
       }
-      .logo { font: 2.4rem/0.9 "Bebas Neue", sans-serif; transform: rotate(-4deg); }
+      .logo { position: relative; width: 100%; max-width: 300px; height: auto; }
+      .logo a { position: absolute; z-index: 1; inset: 0; }
       .menu { width: 4.5rem; height: 3.5rem; background: repeating-linear-gradient(-3deg, #000 0 6px, transparent 6px 22px); }
-      vocalis-flyer-interaktiv { width: 100%; height: 100svh; }
+      vocalis-flyer-interaktiv { width: 100%; height: 100svh; min-height: 200px; }
       section { padding-block: 2.5rem; }
       .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 3rem; }
       .facts ul { list-style: none; margin: 0; padding: 0; border-top: 2px solid; }
@@ -38,7 +40,10 @@
   </head>
   <body>
     <header class="wrap">
-      <div class="logo">Tonverein<br />Vocalis</div>
+      <div class="logo">
+        <img src="Vocalis Logo.svg" />
+        <a class="logo" href="https://tonvereinvocalis.ch"></a>
+      </div>
       <div class="menu" aria-hidden="true"></div>
     </header>
 
