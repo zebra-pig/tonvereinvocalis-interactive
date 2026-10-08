@@ -75,7 +75,6 @@ export class VocalisFlyerInteraktiv extends HTMLElement {
   connectedCallback(): void {
     this.#connected = true
     if (!this.hasAttribute('tabindex')) this.tabIndex = 0
-    this.setAttribute('state', 'flyer')
     void this.#start()
   }
 
