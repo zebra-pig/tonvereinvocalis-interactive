@@ -27,7 +27,18 @@ const template = `
     .hint, .score, .over, .back { display: none; }
     :host([state="flyer"]) .hint-fold, :host([state="ready"]) .hint-fly, :host([state="play"]) .score,
     :host([state="over"]) .over, :host([state="over"]) .back { display: block; }
-    .hint { position: absolute; inset: auto 0 2.5% 0; text-align: center; font: 1.75rem/1 "Bebas Neue", sans-serif; }
+    .hint { position: absolute; inset: auto 0 2% 0; text-align: center; font: 1.75rem/1 "Bebas Neue", sans-serif; }
+    .hint {
+      animation: 1s ease-in-out infinite alternate scale_up;
+    }
+    @keyframes scale_up {
+        from {
+          scale: 100%;
+        }
+        to {
+          scale: 110%;
+        }
+    }
     .score {
       position: absolute; inset: 5% 0 auto 0; text-align: center; font: 4rem/1 "Bebas Neue", sans-serif;
       color: #fff; -webkit-text-stroke: 6px #000; paint-order: stroke fill; /* readable on paper and obstacles */
