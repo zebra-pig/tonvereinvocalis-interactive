@@ -374,6 +374,7 @@ export async function start(host: HTMLElement, root: ShadowRoot, frontUrl: strin
   })
   intersection.observe(host)
   document.addEventListener('visibilitychange', run, { signal })
+  setState('flyer')
   run()
 
   return () => {
